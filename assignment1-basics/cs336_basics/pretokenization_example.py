@@ -2,7 +2,8 @@ import os
 from pathlib import Path
 from typing import BinaryIO
 
-import regex as re
+import bpe
+import pretokenization as pt
 
 PAT = r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
 
@@ -52,7 +53,8 @@ def find_chunk_boundaries(
                 break
             initial_position += mini_chunk_size
 
-    # Make sure all boundaries are unique, but might be fewer than desired_num_chunks
+    # Make sure all boundaries are unique, but might be fewer than
+    # desired_num_chunks
     return sorted(set(chunk_boundaries))
 
 
@@ -62,12 +64,14 @@ data_path = (
     / "data"
     / "TinyStoriesV2-GPT4-train.txt"
 )
+
 with open(data_path, "rb") as f:
     num_processes = 4
     boundaries = find_chunk_boundaries(f, num_processes, b"<|endoftext|>")
     print(f"Found {len(boundaries)} chunk boundaries: {boundaries}")
 
-    # Use a small chunk size for testing, but you can use a larger chunk size for production
+    # Use a small chunk size for testing, but you can use a larger chunk size
+    # for production
     boundaries = [
         0,
         1000,
@@ -88,63 +92,15 @@ with open(data_path, "rb") as f:
         f.seek(start)
         chunk = f.read(end - start).decode("utf-8", errors="ignore")
 
-        # Split chunks to documents by special token, and remove the special token from the chunk
+        # Split chunks to documents by special token, and remove the special
+        # token from the chunk
         documents = chunk.split("<|endoftext|>")
-        for i, doc in enumerate(documents):
-            documents[i] = doc.strip()
-            print(f"Document {i} in chunk {start}-{end}: {documents[i]}")
 
-        # Perform pre-tokenization for each document in the chunk. Create a global pre-token map
-        #  dict[tuple[bytes, ...], int], where the tuple contains the pre-tokenized bytes and the int is the count of that pre-token in the chunk.
-        pre_token_counts: dict[tuple[bytes, ...], int] = {}
-        for i, doc in enumerate(documents):
-            pre_tokens = re.finditer(PAT, doc)
-            for pre_token in pre_tokens:
-                pre_token_bytes = tuple(
-                    bytes([byte]) for byte in pre_token.group().encode("utf-8")
-                )
-                if pre_token_bytes in pre_token_counts:
-                    pre_token_counts[pre_token_bytes] += 1
-                else:
-                    pre_token_counts[pre_token_bytes] = 1
+        pre_token_counts = pt.pre_tokenize(documents, regex_pattern=PAT)
+        # The vocabulary size should be the sum of the lengths of all
+        vocab_size = sum(len(pre_token) for pre_token in pre_token_counts)
+        print("Vocabulary size:", vocab_size)
 
-        # Print the counts for this chunk
-        print(f"Pre-token counts for chunk {start}-{end}:")
-        for pre_token, count in pre_token_counts.items():
-            print(f"  {pre_token}: {count}")
-
-        # count each byte pair in the pre-tokenized bytes and print the counts
-        # for this chunk
-        byte_pair_counts: dict[tuple[bytes, bytes], int] = {}
-        for pre_token, count in pre_token_counts.items():
-            for i in range(len(pre_token) - 1):
-                byte_pair = (pre_token[i], pre_token[i + 1])
-                if byte_pair in byte_pair_counts:
-                    byte_pair_counts[byte_pair] += count
-                else:
-                    byte_pair_counts[byte_pair] = count
-        print(f"Byte pair counts for chunk {start}-{end}:")
-        # Find the pair with the highest count, break ties by lexicographic
-        # order of the first byte, then the second byte
-        most_frequent_byte_pair = None
-        highest_count = 0
-        for byte_pair, count in sorted(
-            byte_pair_counts.items(), key=lambda x: (-x[1], x[0])
-        ):
-            if count > highest_count and (
-                most_frequent_byte_pair is None
-                or byte_pair < most_frequent_byte_pair
-            ):
-                most_frequent_byte_pair = byte_pair
-                highest_count = count
-        print(
-            f"Most frequent byte pair for chunk {start}-{end}: "
-            f"{most_frequent_byte_pair} with count {highest_count}"
-        )
-        # In the pre-token counts, replace the most frequent byte pair with a
-        # new pre-token that is the concatenation of the two bytes in the pair.
-
-        if most_frequent_byte_pair is not None:
-            pass
-
-        break  # Remove this break to process all chunks
+        pre_token_counts, merges = bpe.bpe_train(pre_token_counts, merges=None)
+        vocab_size = sum(len(pre_token) for pre_token in pre_token_counts)
+        print("Vocabulary size after BPE:", vocab_size)
