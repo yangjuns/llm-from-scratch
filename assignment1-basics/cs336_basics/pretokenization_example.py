@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from typing import BinaryIO
 
 import regex as re
@@ -56,7 +57,12 @@ def find_chunk_boundaries(
 
 
 ## Usage
-with open("data/TinyStoriesV2-GPT4-train.txt", "rb") as f:
+data_path = (
+    Path(__file__).resolve().parent.parent
+    / "data"
+    / "TinyStoriesV2-GPT4-train.txt"
+)
+with open(data_path, "rb") as f:
     num_processes = 4
     boundaries = find_chunk_boundaries(f, num_processes, b"<|endoftext|>")
     print(f"Found {len(boundaries)} chunk boundaries: {boundaries}")
@@ -125,13 +131,12 @@ with open("data/TinyStoriesV2-GPT4-train.txt", "rb") as f:
         for byte_pair, count in sorted(
             byte_pair_counts.items(), key=lambda x: (-x[1], x[0])
         ):
-            if count > highest_count:
-                if (
-                    most_frequent_byte_pair is None
-                    or byte_pair < most_frequent_byte_pair
-                ):
-                    most_frequent_byte_pair = byte_pair
-                    highest_count = count
+            if count > highest_count and (
+                most_frequent_byte_pair is None
+                or byte_pair < most_frequent_byte_pair
+            ):
+                most_frequent_byte_pair = byte_pair
+                highest_count = count
         print(
             f"Most frequent byte pair for chunk {start}-{end}: "
             f"{most_frequent_byte_pair} with count {highest_count}"
