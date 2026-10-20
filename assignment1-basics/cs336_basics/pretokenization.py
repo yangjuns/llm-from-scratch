@@ -3,8 +3,6 @@ from typing import BinaryIO
 
 import regex as re
 
-PAT = r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
-
 
 def find_chunk_boundaries(
     file: BinaryIO,
@@ -56,13 +54,13 @@ def find_chunk_boundaries(
     return sorted(set(chunk_boundaries))
 
 
-def pre_tokenize_doc_segment(doc_segment: str, special_tokens: list[str]):
+def pre_tokenize_doc_segment(doc_segment: str, regex_pattern: str):
     """
     Pre-tokenize a document segment using the regex pattern defined in PAT.
     The function creates a global pre-token map dict[tuple[bytes, ...], int]
     """
     pre_token_counts: dict[tuple[bytes, ...], int] = {}
-    pre_tokens = re.finditer(PAT, doc_segment)
+    pre_tokens = re.finditer(regex_pattern, doc_segment)
     for pre_token in pre_tokens:
         pre_token_bytes = tuple(
             bytes([byte]) for byte in pre_token.group().encode("utf-8")
@@ -77,11 +75,12 @@ def pre_tokenize_doc_segment(doc_segment: str, special_tokens: list[str]):
 def pre_tokenize_doc(
     document: str,
     special_tokens: list[str],
+    regex_pattern: str,
 ):
     segments = re.split("|".join(special_tokens), document)
     doc_token_counts: dict[tuple[bytes, ...], int] = {}
     for segment in segments:
-        segment_token_counts = pre_tokenize_doc_segment(segment, special_tokens)
+        segment_token_counts = pre_tokenize_doc_segment(segment, regex_pattern)
         for token, count in segment_token_counts.items():
             if token in doc_token_counts:
                 doc_token_counts[token] += count
@@ -93,6 +92,7 @@ def pre_tokenize_doc(
 def pre_tokenize(
     documents: list[str],
     special_tokens: list[str],
+    regex_pattern: str,
 ):
     """
     Pre-tokenize a list of documents using the regex pattern defined in PAT.
@@ -106,7 +106,7 @@ def pre_tokenize(
     #  pre-token in the chunk.
     token_counts: dict[tuple[bytes, ...], int] = {}
     for doc in documents:
-        doc_token_counts = pre_tokenize_doc(doc, special_tokens)
+        doc_token_counts = pre_tokenize_doc(doc, special_tokens, regex_pattern)
         for token, count in doc_token_counts.items():
             if token in token_counts:
                 token_counts[token] += count

@@ -9,6 +9,9 @@ import torch
 from jaxtyping import Bool, Float, Int
 from torch import Tensor
 
+import cs336_basics.pretokenization as pt
+import cs336_basics.bpe as bpe
+
 
 def run_linear(
     d_in: int,
@@ -418,7 +421,9 @@ def run_get_batch(
     raise NotImplementedError
 
 
-def run_softmax(in_features: Float[Tensor, " ..."], dim: int) -> Float[Tensor, " ..."]:
+def run_softmax(
+    in_features: Float[Tensor, " ..."], dim: int
+) -> Float[Tensor, " ..."]:
     """
     Given a tensor of inputs, return the output of softmaxing the given `dim`
     of the input.
@@ -435,7 +440,8 @@ def run_softmax(in_features: Float[Tensor, " ..."], dim: int) -> Float[Tensor, "
 
 
 def run_cross_entropy(
-    inputs: Float[Tensor, " batch_size vocab_size"], targets: Int[Tensor, " batch_size"]
+    inputs: Float[Tensor, " batch_size vocab_size"],
+    targets: Int[Tensor, " batch_size"],
 ) -> Float[Tensor, ""]:
     """Given a tensor of inputs and targets, compute the average cross-entropy
     loss across examples.
@@ -452,7 +458,9 @@ def run_cross_entropy(
     raise NotImplementedError
 
 
-def run_gradient_clipping(parameters: Iterable[torch.nn.Parameter], max_l2_norm: float) -> None:
+def run_gradient_clipping(
+    parameters: Iterable[torch.nn.Parameter], max_l2_norm: float
+) -> None:
     """Given a set of parameters, clip their combined gradients to have l2 norm at most max_l2_norm.
 
     Args:
@@ -589,4 +597,33 @@ def run_train_bpe(
                 representing that <token1> was merged with <token2>.
                 Merges are ordered by order of creation.
     """
-    raise NotImplementedError
+    with open(input_path, "rb") as f:
+        num_processes = 4
+        boundaries = pt.find_chunk_boundaries(
+            f, num_processes, b"<|endoftext|>"
+        )
+        PAT = r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
+        # The following is a serial implementation, but you can parallelize this
+        # by sending each start/end pair to a set of processes.
+        pre_token_counts: dict[tuple[bytes, ...], int] = {}
+        for start, end in zip(boundaries[:-1], boundaries[1:]):
+            f.seek(start)
+            chunk = f.read(end - start).decode("utf-8", errors="ignore")
+
+            # Split chunks to documents by special token, and remove the special
+            # token from the chunk
+            documents = chunk.split("<|endoftext|>")
+
+            doc_pt_counts = pt.pre_tokenize(documents, special_tokens, PAT)
+            for token, count in doc_pt_counts.items():
+                pre_token_counts[token] = pre_token_counts.get(token, 0) + count
+
+        # The vocabulary size should be the sum of the lengths of all
+        vocab, merges = bpe.bpe_train(
+            pre_token_counts,
+            target_vocab_size=vocab_size,
+            special_tokens=special_tokens,
+        )
+        print(f"Vocabulary size: {len(vocab)}")
+        print(f"Number of merges: {len(merges)}")
+        return vocab, merges
