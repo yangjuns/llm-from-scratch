@@ -37,6 +37,9 @@ def bpe_train(
             next_token_id += 1
 
     merges: list[tuple[bytes, bytes]] = []
+    # print pre_token_counts
+    for pre_token, count in pre_token_counts.items():
+        print(f"{pre_token}  :  {count}")
 
     # Create a global hash table that maps (bytes, bytes) to a list of
     # BytesPairNode
@@ -51,6 +54,10 @@ def bpe_train(
             if node.prev is not None:
                 node.prev.next = node
             prev_node = node
+
+            print(
+                f"{node.pair} : {node.count} <- : {node.prev} -> {node.next} "
+            )
             if node.pair in pair_nodes:
                 pair_nodes[node.pair].append(node)
             else:
@@ -92,59 +99,66 @@ def bpe_train(
         #     f"Most frequent byte pair: {highest_pair}, count: {highest_count}"
         # )
         # Merge the pair
-        if highest_pair is not None:
-            # Update vocab
-            merged_bytes = highest_pair[0] + highest_pair[1]
-            vocab[next_token_id] = merged_bytes
-            next_token_id += 1
-            merges.append(highest_pair)
-            for node in pair_nodes[highest_pair]:
-                # X A B Y => X AB Y
-                if node.prev is not None:
-                    old_left_node = node.prev
+        if highest_pair is None:
+            break
 
-                    # Construct new left node
-                    new_pair = (old_left_node.pair[0], merged_bytes)
-                    new_left_node = BytesPairNode(
-                        new_pair,
-                        old_left_node.count,
-                    )
-                    new_left_node.prev = old_left_node.prev
-                    new_left_node.next = node.next
-                    # Update hash table
-                    if new_pair in pair_nodes:
-                        pair_nodes[new_pair].append(new_left_node)
-                    else:
-                        pair_nodes[new_pair] = [new_left_node]
-                    # Update the pair_count
-                    pair_counts[old_left_node.pair] -= old_left_node.count
+        # Update vocab
+        merged_bytes = highest_pair[0] + highest_pair[1]
+        vocab[next_token_id] = merged_bytes
+        next_token_id += 1
+        merges.append(highest_pair)
+        for node in pair_nodes[highest_pair]:
+            # X A B Y => X AB Y
+            if node.prev is not None:
+                old_left_node = node.prev
 
-                    pair_counts[new_left_node.pair] = (
-                        pair_counts.get(new_left_node.pair, 0)
-                        + new_left_node.count
-                    )
-                if node.next is not None:
-                    old_right_node = node.next
-                    # Construct new right node
-                    new_pair = (merged_bytes, old_right_node.pair[1])
-                    new_right_node = BytesPairNode(
-                        new_pair,
-                        old_right_node.count,
-                    )
-                    new_right_node.next = old_right_node.next
-                    new_right_node.prev = node.prev
-                    if new_pair in pair_nodes:
-                        pair_nodes[new_pair].append(new_right_node)
-                    else:
-                        pair_nodes[new_pair] = [new_right_node]
-                    # Update the pair_count
-                    pair_counts[old_right_node.pair] -= old_right_node.count
-                    pair_counts[new_right_node.pair] = (
-                        pair_counts.get(new_right_node.pair, 0)
-                        + new_right_node.count
-                    )
-            del pair_nodes[highest_pair]
-            del pair_counts[highest_pair]
+                # Construct new left node
+                new_pair = (old_left_node.pair[0], merged_bytes)
+                new_left_node = BytesPairNode(
+                    new_pair,
+                    old_left_node.count,
+                )
+                new_left_node.prev = old_left_node.prev
+                new_left_node.next = node.next
+                # Update hash table
+                if new_pair in pair_nodes:
+                    pair_nodes[new_pair].append(new_left_node)
+                else:
+                    pair_nodes[new_pair] = [new_left_node]
+                # Update the pair_count
+                pair_counts[old_left_node.pair] -= old_left_node.count
+
+                pair_counts[new_left_node.pair] = (
+                    pair_counts.get(new_left_node.pair, 0) + new_left_node.count
+                )
+                print(
+                    f"new_node_left.pair: {new_left_node.pair}, count : {new_left_node.count}"
+                )
+            if node.next is not None:
+                old_right_node = node.next
+                print(
+                    f"{old_right_node.pair} : {old_right_node.count} <- {old_right_node.prev} -> {old_right_node.next}"
+                )
+                # Construct new right node
+                new_pair = (merged_bytes, old_right_node.pair[1])
+                new_right_node = BytesPairNode(
+                    new_pair,
+                    old_right_node.count,
+                )
+                new_right_node.next = old_right_node.next
+                new_right_node.prev = node.prev
+                if new_pair in pair_nodes:
+                    pair_nodes[new_pair].append(new_right_node)
+                else:
+                    pair_nodes[new_pair] = [new_right_node]
+                # Update the pair_count
+                pair_counts[old_right_node.pair] -= old_right_node.count
+                pair_counts[new_right_node.pair] = (
+                    pair_counts.get(new_right_node.pair, 0)
+                    + new_right_node.count
+                )
+        del pair_nodes[highest_pair]
+        del pair_counts[highest_pair]
 
     print(f"Final vocabulary size: {len(vocab)}")
     return vocab, merges
