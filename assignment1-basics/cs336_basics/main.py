@@ -31,7 +31,7 @@ pre_token_counts = pt.pre_tokenize(
 
 vocab, merges = bpe.bpe_train(
     pre_token_counts,
-    target_vocab_size=8,
+    target_vocab_size=256 + 6,
     special_tokens=["<|endoftext|>"],
 )
 # Print vocab and merges

@@ -1,9 +1,57 @@
-class BytesPairNode:
-    def __init__(self, pair: tuple[bytes, bytes], count: int):
-        self.pair = pair
+from pprint import pprint
+
+
+class TokenNode:
+    def __init__(self, token: bytes | None, count: int):
+        self.token = token
         self.count = count
-        self.prev: BytesPairNode | None = None
-        self.next: BytesPairNode | None = None
+        self.prev: TokenNode | None = None
+        self.next: TokenNode | None = None
+
+    def __repr__(self) -> str:
+
+        return (
+            f"TokenNode(token={self.token}, count={self.count}, "
+            f"prev={self.prev.token if self.prev else None}, "
+            f"next={self.next.token if self.next else None})"
+        )
+
+
+class TokenNodeList:
+    def __init__(self):
+        self.head: TokenNode | None = None
+        self.tail: TokenNode | None = None
+
+    def append(self, node: TokenNode):
+        if self.tail is None:
+            self.head = self.tail = node
+        else:
+            self.tail.next = node
+            node.prev = self.tail
+            self.tail = node
+
+
+class PairCounters:
+    def __init__(self):
+        self.pair_counts: dict[tuple[bytes, bytes], int] = {}
+
+    def increment(self, pair: tuple[bytes, bytes], count: int):
+        if pair in self.pair_counts:
+            self.pair_counts[pair] += count
+        else:
+            self.pair_counts[pair] = count
+
+    def decrement(self, pair: tuple[bytes, bytes], count: int):
+        if pair in self.pair_counts:
+            self.pair_counts[pair] -= count
+            if self.pair_counts[pair] == 0:
+                del self.pair_counts[pair]
+
+    def __getitem__(self, pair: tuple[bytes, bytes]):
+        return self.pair_counts.get(pair, 0)
+
+    def __setitem__(self, pair: tuple[bytes, bytes], count: int):
+        self.pair_counts[pair] = count
 
 
 def is_pair_greater(l: tuple[bytes, bytes], r: tuple[bytes, bytes]):
@@ -38,53 +86,47 @@ def bpe_train(
 
     merges: list[tuple[bytes, bytes]] = []
     # print pre_token_counts
-    for pre_token, count in pre_token_counts.items():
-        print(f"{pre_token}  :  {count}")
+    pprint(pre_token_counts)
 
-    # Create a global hash table that maps (bytes, bytes) to a list of
-    # BytesPairNode
-    pair_nodes: dict[tuple[bytes, bytes], list[BytesPairNode]] = {}
+    # Create a global hash table that maps bytes to a list of
+    # TokenNodes
+    pair_nodes: dict[bytes, list[TokenNode]] = {}
     for pre_token, count in pre_token_counts.items():
         # Create a Double-Linked list for each pre-token, and add the node to
         # the hash table.
         prev_node = None
-        for i in range(len(pre_token) - 1):
-            node = BytesPairNode((pre_token[i], pre_token[i + 1]), count)
+        for i in range(len(pre_token)):
+            node = TokenNode(pre_token[i], count)
             node.prev = prev_node
             if node.prev is not None:
                 node.prev.next = node
             prev_node = node
 
-            print(
-                f"{node.pair} : {node.count} <- : {node.prev} -> {node.next} "
-            )
-            if node.pair in pair_nodes:
-                pair_nodes[node.pair].append(node)
+            pprint(node)
+            assert node.token is not None
+            if node.token in pair_nodes:
+                pair_nodes[node.token].append(node)
             else:
-                pair_nodes[node.pair] = [node]
+                pair_nodes[node.token] = [node]
 
     # Build the cache of the byte pairs and their counts.
-    pair_counts: dict[tuple[bytes, bytes], int] = {}
+    pair_counters = PairCounters()
     for pre_token, count in pre_token_counts.items():
         for i in range(len(pre_token) - 1):
             byte_pair = (pre_token[i], pre_token[i + 1])
-            if byte_pair in pair_counts:
-                pair_counts[byte_pair] += count
-            else:
-                pair_counts[byte_pair] = count
+            pair_counters.increment(byte_pair, count)
     # Print pair counts for debugging
     print("Initial pair counts:")
-    for pair, count in pair_counts.items():
-        print(f"{pair}: {count}")
+    pprint(pair_counters)
 
     while len(vocab) < target_vocab_size:
-        # for pair, count in pair_counts.items():
+        # for pair, count in pair_counters.items():
         #     print(f"{pair}: {count}")
         # Find the pair with the highest count, break ties by lexicographic
         # order of the first byte, then the second byte
         highest_count = 0
         highest_pair = None
-        for pair, count in pair_counts.items():
+        for pair, count in pair_counters.pair_counts.items():
             if count > highest_count:
                 highest_count = count
                 highest_pair = pair
@@ -94,10 +136,6 @@ def bpe_train(
                 and is_pair_greater(pair, highest_pair)
             ):
                 highest_pair = pair
-        # # Print most frequent byte pair for debugging
-        # print(
-        #     f"Most frequent byte pair: {highest_pair}, count: {highest_count}"
-        # )
         # Merge the pair
         if highest_pair is None:
             break
@@ -107,58 +145,59 @@ def bpe_train(
         vocab[next_token_id] = merged_bytes
         next_token_id += 1
         merges.append(highest_pair)
-        for node in pair_nodes[highest_pair]:
+        for node in pair_nodes[highest_pair[0]]:
+            if (
+                node.token is None
+                or node.next is None
+                or node.next.token != highest_pair[1]
+            ):
+                # The node has been merged and no longer represents a valid
+                # occurrence of the selected pair.
+                continue
             # X A B Y => X AB Y
-            if node.prev is not None:
-                old_left_node = node.prev
+            # Construct a new node for the merged bytes
+            new_node = TokenNode(
+                merged_bytes,
+                node.count,
+            )
+            # Update hash table
+            if merged_bytes in pair_nodes:
+                pair_nodes[merged_bytes].append(new_node)
+            else:
+                pair_nodes[merged_bytes] = [new_node]
+            # Invalidate the original pair nodes
+            node.token = None
+            node.next.token = None
+            # Connect the new node with the surrounding nodes
+            node_before_pair = node.prev
+            node_after_pair = node.next.next
+            new_node.prev = node_before_pair
+            new_node.next = node_after_pair
+            # Decrement the count of the highest pair since this node is being merged
+            pair_counters.decrement(highest_pair, node.count)
+            if node_before_pair is not None:
+                # Old left node now needs to connect to the new node
+                node_before_pair.next = new_node
 
-                # Construct new left node
-                new_pair = (old_left_node.pair[0], merged_bytes)
-                new_left_node = BytesPairNode(
-                    new_pair,
-                    old_left_node.count,
-                )
-                new_left_node.prev = old_left_node.prev
-                new_left_node.next = node.next
-                # Update hash table
-                if new_pair in pair_nodes:
-                    pair_nodes[new_pair].append(new_left_node)
-                else:
-                    pair_nodes[new_pair] = [new_left_node]
-                # Update the pair_count
-                pair_counts[old_left_node.pair] -= old_left_node.count
+                # Update the pair counters for the old and new pairs
+                assert node_before_pair.token is not None
+                old_pair = (node_before_pair.token, highest_pair[0])
+                pair_counters.decrement(old_pair, node.count)
+                new_pair = (node_before_pair.token, merged_bytes)
+                pair_counters.increment(new_pair, new_node.count)
+            if node_after_pair is not None:
+                # The old right node is the node after the merged pair. It
+                # needs to connect to the new node
+                node_after_pair.prev = new_node
 
-                pair_counts[new_left_node.pair] = (
-                    pair_counts.get(new_left_node.pair, 0) + new_left_node.count
-                )
-                print(
-                    f"new_node_left.pair: {new_left_node.pair}, count : {new_left_node.count}"
-                )
-            if node.next is not None:
-                old_right_node = node.next
-                print(
-                    f"{old_right_node.pair} : {old_right_node.count} <- {old_right_node.prev} -> {old_right_node.next}"
-                )
+                # Update the pair counters for the old and new pairs
+                assert node_after_pair.token is not None
+                assert new_node.token is not None
+                old_pair = (highest_pair[1], node_after_pair.token)
                 # Construct new right node
-                new_pair = (merged_bytes, old_right_node.pair[1])
-                new_right_node = BytesPairNode(
-                    new_pair,
-                    old_right_node.count,
-                )
-                new_right_node.next = old_right_node.next
-                new_right_node.prev = node.prev
-                if new_pair in pair_nodes:
-                    pair_nodes[new_pair].append(new_right_node)
-                else:
-                    pair_nodes[new_pair] = [new_right_node]
-                # Update the pair_count
-                pair_counts[old_right_node.pair] -= old_right_node.count
-                pair_counts[new_right_node.pair] = (
-                    pair_counts.get(new_right_node.pair, 0)
-                    + new_right_node.count
-                )
-        del pair_nodes[highest_pair]
-        del pair_counts[highest_pair]
+                new_pair = (merged_bytes, node_after_pair.token)
+                pair_counters.decrement(old_pair, node_after_pair.count)
+                pair_counters.increment(new_pair, node_after_pair.count)
 
     print(f"Final vocabulary size: {len(vocab)}")
     return vocab, merges

@@ -1,7 +1,6 @@
 import unittest
 
-# Assuming your function is saved in bpe.py. Adjust the import name if needed.
-from bpe import BytesPairNode, bpe_train, is_pair_greater
+from .bpe import bpe_train, is_pair_greater
 
 
 class TestBPEPairComparison(unittest.TestCase):
@@ -68,6 +67,22 @@ class TestBPETrain(unittest.TestCase):
         self.assertEqual(len(merges), 1)
         self.assertEqual(merges[0], (b"a", b"b"))
         self.assertIn(b"ab", vocab.values())
+
+    def test_merge_only_matching_pair_occurrences(self):
+        """Do not merge other tokens that share only the selected pair's first byte."""
+        pre_token_counts = {
+            (b"a", b"b"): 5,
+            (b"a", b"c"): 4,
+        }
+
+        vocab, merges = bpe_train(
+            pre_token_counts=pre_token_counts,
+            target_vocab_size=258,
+        )
+
+        self.assertEqual(merges, [(b"a", b"b"), (b"a", b"c")])
+        self.assertIn(b"ab", vocab.values())
+        self.assertIn(b"ac", vocab.values())
 
     def test_lexicographical_tie_breaking(self):
         """When counts are equal, higher lexicographical pair should be chosen."""
@@ -162,7 +177,7 @@ class TestBPEOverlappingPairs(unittest.TestCase):
         self.assertIn(b"aaaa", vocab.values())
 
 
-def test_interleaved_common_substrings(self):
+def test_interleaved_common_substrings():
     """Verify safety when old_right_node.pair or old_left_node.pair
 
     coincides with highest_pair across multiple word types.
@@ -177,8 +192,8 @@ def test_interleaved_common_substrings(self):
         target_vocab_size=258,
     )
 
-    self.assertEqual(merges[0], (b"t", b"h"))
-    self.assertIn(b"th", vocab.values())
+    assert merges[0] == (b"t", b"h")
+    assert b"th" in vocab.values()
 
 
 if __name__ == "__main__":
