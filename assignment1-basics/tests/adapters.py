@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from concurrent.futures import ProcessPoolExecutor
 from collections.abc import Iterable
 from typing import IO, Any, BinaryIO
 
@@ -570,6 +571,18 @@ def get_tokenizer(
     raise NotImplementedError
 
 
+def _pretokenize_bpe_chunk(
+    args: tuple[str | os.PathLike, int, int, list[str], str],
+) -> dict[tuple[bytes, ...], int]:
+    input_path, start, end, special_tokens, pattern = args
+    with open(input_path, "rb") as f:
+        f.seek(start)
+        chunk = f.read(end - start).decode("utf-8", errors="ignore")
+
+    documents = chunk.split("<|endoftext|>")
+    return pt.pre_tokenize(documents, special_tokens, pattern)
+
+
 def run_train_bpe(
     input_path: str | os.PathLike,
     vocab_size: int,
@@ -603,20 +616,18 @@ def run_train_bpe(
             f, num_processes, b"<|endoftext|>"
         )
         PAT = r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
-        # The following is a serial implementation, but you can parallelize this
-        # by sending each start/end pair to a set of processes.
+        # Process each byte range independently, then combine the counts.
         pre_token_counts: dict[tuple[bytes, ...], int] = {}
-        for start, end in zip(boundaries[:-1], boundaries[1:]):
-            f.seek(start)
-            chunk = f.read(end - start).decode("utf-8", errors="ignore")
-
-            # Split chunks to documents by special token, and remove the special
-            # token from the chunk
-            documents = chunk.split("<|endoftext|>")
-
-            doc_pt_counts = pt.pre_tokenize(documents, special_tokens, PAT)
-            for token, count in doc_pt_counts.items():
-                pre_token_counts[token] = pre_token_counts.get(token, 0) + count
+        tasks = [
+            (input_path, start, end, special_tokens, PAT)
+            for start, end in zip(boundaries[:-1], boundaries[1:])
+        ]
+        with ProcessPoolExecutor(max_workers=num_processes) as executor:
+            for doc_pt_counts in executor.map(_pretokenize_bpe_chunk, tasks):
+                for token, count in doc_pt_counts.items():
+                    pre_token_counts[token] = (
+                        pre_token_counts.get(token, 0) + count
+                    )
 
         # The vocabulary size should be the sum of the lengths of all
         vocab, merges = bpe.bpe_train(
