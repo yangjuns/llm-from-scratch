@@ -85,8 +85,6 @@ def bpe_train(
             next_token_id += 1
 
     merges: list[tuple[bytes, bytes]] = []
-    # print pre_token_counts
-    pprint(pre_token_counts)
 
     # Create a global hash table that maps bytes to a list of
     # TokenNodes
@@ -101,8 +99,6 @@ def bpe_train(
             if node.prev is not None:
                 node.prev.next = node
             prev_node = node
-
-            pprint(node)
             assert node.token is not None
             if node.token in pair_nodes:
                 pair_nodes[node.token].append(node)
@@ -115,13 +111,8 @@ def bpe_train(
         for i in range(len(pre_token) - 1):
             byte_pair = (pre_token[i], pre_token[i + 1])
             pair_counters.increment(byte_pair, count)
-    # Print pair counts for debugging
-    print("Initial pair counts:")
-    pprint(pair_counters)
 
     while len(vocab) < target_vocab_size:
-        # for pair, count in pair_counters.items():
-        #     print(f"{pair}: {count}")
         # Find the pair with the highest count, break ties by lexicographic
         # order of the first byte, then the second byte
         highest_count = 0
