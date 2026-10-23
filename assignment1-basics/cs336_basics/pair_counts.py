@@ -23,6 +23,15 @@ class PairCounters:
         self.pair_counts: dict[tuple[bytes, bytes], int] = {}
         self._heap: list[tuple[int, _ReversedPair]] = []
 
+    def initialize(self, pair_counts: dict[tuple[bytes, bytes], int]):
+        self.pair_counts = pair_counts.copy()
+        self._heap = [
+            (-count, _ReversedPair(pair))
+            for pair, count in self.pair_counts.items()
+            if count > 0
+        ]
+        heapq.heapify(self._heap)
+
     def _push(self, pair: tuple[bytes, bytes]):
         count = self.pair_counts[pair]
         if count > 0:

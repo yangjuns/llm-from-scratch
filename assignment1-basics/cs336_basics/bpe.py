@@ -86,10 +86,14 @@ def bpe_train(
 
     # Build the cache of the byte pairs and their counts.
     pair_counters = PairCounters()
+    initial_pair_counts: dict[tuple[bytes, bytes], int] = {}
     for pre_token, count in pre_token_counts.items():
         for i in range(len(pre_token) - 1):
             byte_pair = (pre_token[i], pre_token[i + 1])
-            pair_counters.increment(byte_pair, count)
+            initial_pair_counts[byte_pair] = (
+                initial_pair_counts.get(byte_pair, 0) + count
+            )
+    pair_counters.initialize(initial_pair_counts)
 
     while len(vocab) < target_vocab_size:
         # Find the pair with the highest count, break ties by lexicographic
