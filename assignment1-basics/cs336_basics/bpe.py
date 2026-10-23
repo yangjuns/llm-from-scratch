@@ -1,5 +1,7 @@
 from pprint import pprint
 
+from cs336_basics.pair_counts import PairCounters
+
 
 class TokenNode:
     def __init__(self, token: bytes | None, count: int):
@@ -29,29 +31,6 @@ class TokenNodeList:
             self.tail.next = node
             node.prev = self.tail
             self.tail = node
-
-
-class PairCounters:
-    def __init__(self):
-        self.pair_counts: dict[tuple[bytes, bytes], int] = {}
-
-    def increment(self, pair: tuple[bytes, bytes], count: int):
-        if pair in self.pair_counts:
-            self.pair_counts[pair] += count
-        else:
-            self.pair_counts[pair] = count
-
-    def decrement(self, pair: tuple[bytes, bytes], count: int):
-        if pair in self.pair_counts:
-            self.pair_counts[pair] -= count
-            if self.pair_counts[pair] == 0:
-                del self.pair_counts[pair]
-
-    def __getitem__(self, pair: tuple[bytes, bytes]):
-        return self.pair_counts.get(pair, 0)
-
-    def __setitem__(self, pair: tuple[bytes, bytes], count: int):
-        self.pair_counts[pair] = count
 
 
 def is_pair_greater(l: tuple[bytes, bytes], r: tuple[bytes, bytes]):
@@ -115,18 +94,7 @@ def bpe_train(
     while len(vocab) < target_vocab_size:
         # Find the pair with the highest count, break ties by lexicographic
         # order of the first byte, then the second byte
-        highest_count = 0
-        highest_pair = None
-        for pair, count in pair_counters.pair_counts.items():
-            if count > highest_count:
-                highest_count = count
-                highest_pair = pair
-            elif (
-                count == highest_count
-                and highest_pair is not None
-                and is_pair_greater(pair, highest_pair)
-            ):
-                highest_pair = pair
+        highest_pair = pair_counters.best()
         # Merge the pair
         if highest_pair is None:
             break

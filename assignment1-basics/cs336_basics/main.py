@@ -1,7 +1,7 @@
 ## Usage
 from pathlib import Path
 
-import bpe
+from cs336_basics import bpe
 import pretokenization as pt
 
 import regex as re
