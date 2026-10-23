@@ -1,10 +1,8 @@
 ## Usage
 from pathlib import Path
 
-import bpe
-import pretokenization as pt
-
-import regex as re
+from cs336_basics import bpe
+from cs336_basics import pretokenization as pt
 
 data_path = (
     Path(__file__).resolve().parent.parent

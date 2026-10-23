@@ -1,6 +1,6 @@
 import unittest
 
-from .bpe import bpe_train, is_pair_greater
+from cs336_basics.bpe import bpe_train, is_pair_greater
 
 
 class TestBPEPairComparison(unittest.TestCase):
