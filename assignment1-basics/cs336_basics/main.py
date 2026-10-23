@@ -2,9 +2,7 @@
 from pathlib import Path
 
 from cs336_basics import bpe
-import pretokenization as pt
-
-import regex as re
+from cs336_basics import pretokenization as pt
 
 data_path = (
     Path(__file__).resolve().parent.parent
