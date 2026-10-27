@@ -55,6 +55,5 @@ Mean token length by merge rank:
 ## Next steps
 
 - Count whitespace-run tokens and case/space duplicate token groups in each vocab.
-
 - Measure bytes/token on the TinyStories and OWT validation sets with each tokenizer.
 - Cross-evaluate: TinyStories tokenizer on OWT and vice versa.
