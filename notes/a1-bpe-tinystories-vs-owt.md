@@ -37,7 +37,24 @@ Mean token length by merge rank:
 - OWT training cost (32k vocab, 8 processes): 1h10m wall-clock, ~27 GB peak RSS, on a remote GCP CPU. Commit used: `5632caa`.
 - The `owe_train_bpe` output dir name in the remote log was a typo; renamed locally to `owt_train_bpe`.
 
+## Why so many tokens start with a space?
+
+- 75% of the TinyStories vocab and 69% of OWT start with a space. This is expected, not a bug.
+- The GPT-2 pre-tokenizer regex attaches a single leading space to each word (` ?\p{L}+`), and BPE merges never cross pre-token boundaries. Mid-sentence words almost always follow a space, so ` the` is the common form and `the` is rare.
+- Why it's a good design:
+  - Decoding is lossless with no separate whitespace tokens.
+  - It avoids spending a token on every space, which would roughly double sequence length.
+  - Word-initial and word-continuation pieces stay distinct (` un` vs `un`).
+- Real downsides:
+  - Duplicated vocab: `the`, ` the`, `The` and ` The` are separate tokens.
+  - Spacing sensitivity: a trailing space in a prompt tokenizes separately from the next word, which can behave oddly.
+  - No benefit for languages without spaces (Chinese, Japanese).
+- OWT has a lower share because of more punctuation, symbols, non-ASCII text and subword pieces.
+- Things that would actually be a concern: whitespace-only tokens and junk runs (`----`, mojibake), not space-prefixed words.
+
 ## Next steps
+
+- Count whitespace-run tokens and case/space duplicate token groups in each vocab.
 
 - Measure bytes/token on the TinyStories and OWT validation sets with each tokenizer.
 - Cross-evaluate: TinyStories tokenizer on OWT and vice versa.
