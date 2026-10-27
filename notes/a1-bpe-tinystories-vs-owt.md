@@ -1,6 +1,6 @@
 # BPE tokenizer: TinyStories vs OpenWebText
 
-Artifacts (gitignored): `artifacts/tinystories_bpe/` (10k vocab) and `artifacts/owt_train_bpe/` (32k vocab).
+Artifacts (gitignored): `assignment1-basics/artifacts/tinystories_bpe/` (10k vocab) and `assignment1-basics/artifacts/owt_train_bpe/` (32k vocab).
 Comparison is from vocab/merge statistics only; no compression-ratio (bytes/token) measurement yet.
 
 ## Stats
