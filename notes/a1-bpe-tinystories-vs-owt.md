@@ -28,6 +28,25 @@
 - `json.load` on these files returns a list of dicts, so convert to
   `dict[int, bytes]` and `list[tuple[bytes, bytes]]` after loading.
 
+## Special tokens
+
+- Nearly every modern tokenizer defines them:
+  - Document boundaries: `<|endoftext|>` (GPT-2/3/4), `<s>`/`</s>` (Llama 2, T5),
+    `<|begin_of_text|>`/`<|end_of_text|>` (Llama 3).
+  - Padding/unknown: `<pad>`, `<unk>` (byte-level BPE rarely needs `<unk>`).
+  - Chat formatting: `<|im_start|>`, `<|im_end|>`, role headers.
+  - Tool use / reasoning (`<think>`), multimodal placeholders, FIM markers.
+- Training: they are reserved vocab entries, not text that feeds merge counting.
+  - Declared up front with fixed IDs and count toward vocab size.
+  - Corpus is split on them before pre-tokenization, so merges never cross
+    them and never learn their characters (e.g. `<|endof` + `text|>`).
+  - Parallel chunk boundaries are aligned to the special token.
+- Encoding: split on special tokens, map each directly to its ID, run BPE on
+  the text between. Match longest first when they overlap.
+- Data pipeline: insert an EOS/separator between documents when tokenizing;
+  many chat/tool tokens are added later in fine-tuning and their embeddings
+  are trained then.
+
 # Part 2: TinyStories vs OpenWebText
 
 Artifacts (gitignored): `assignment1-basics/artifacts/tinystories_bpe/` (10k vocab) and `assignment1-basics/artifacts/owt_train_bpe/` (32k vocab).
