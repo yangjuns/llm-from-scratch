@@ -31,7 +31,8 @@
 # Part 2: TinyStories vs OpenWebText
 
 Artifacts (gitignored): `assignment1-basics/artifacts/tinystories_bpe/` (10k vocab) and `assignment1-basics/artifacts/owt_train_bpe/` (32k vocab).
-Comparison is from vocab/merge statistics only; no compression-ratio (bytes/token) measurement yet.
+Comparison includes vocab/merge statistics and sampled compression-ratio
+(bytes/token) measurements.
 
 ## Stats
 
@@ -60,6 +61,68 @@ Mean token length by merge rank:
 - At equal ranks OWT tokens are slightly shorter; its higher overall mean comes from the bigger vocab and the long junk tokens.
 - OWT has fewer space-prefixed tokens because of more punctuation, symbols and non-ASCII tokens.
 
+## Sampled compression ratio
+
+Sampled 10 documents from each validation split using `random.Random(42)`.
+Documents were split on `<|endoftext|>`, stripped, and sampled independently
+from their own corpus. Ratios are total UTF-8 document bytes divided by total
+token IDs; separators are excluded. Each row uses the same documents for both
+tokenizers, so the cross-tokenizer comparison is directly comparable.
+
+| Sample documents | Bytes | Tokenizer | Tokens | Bytes/token |
+|---|---:|---|---:|---:|
+| TinyStories (10 docs) | 8,457 | TinyStories 10K | 2,084 | 4.058 |
+| TinyStories (10 docs) | 8,457 | OpenWebText 32K | 2,145 | 3.943 |
+| OpenWebText (10 docs) | 39,375 | TinyStories 10K | 12,439 | 3.165 |
+| OpenWebText (10 docs) | 39,375 | OpenWebText 32K | 9,275 | 4.245 |
+
+| Sample documents | TinyStories tokenizer | OpenWebText tokenizer |
+|---|---:|---:|
+| TinyStories | 4.058 bytes/token | 3.943 bytes/token |
+| OpenWebText | 3.165 bytes/token | 4.245 bytes/token |
+
+On these samples, the OpenWebText tokenizer's ratio on TinyStories is about
+3% lower than the TinyStories tokenizer's. On OpenWebText, the TinyStories
+tokenizer's ratio is about 25% lower than the OpenWebText tokenizer's. Lower
+bytes/token means more token IDs are needed for the same document bytes.
+Qualitatively, the TinyStories tokenizer splits some OpenWebText words into
+more pieces (for example, `demographic` into `dem`, `og`, `ra`, `ph`), while
+the OpenWebText tokenizer handles that word as one token.
+
+## Tokenization throughput on OpenWebText
+
+Benchmarked all 59,059 documents in `owt_valid.txt`. The file is 289,998,753
+bytes; after splitting on `<|endoftext|>` and stripping document boundaries,
+the encoded text is 289,230,986 UTF-8 bytes. Data and tokenizer were loaded
+before timing, the first document was used as a warm-up, and each document was
+encoded separately. The separator is excluded. Each implementation was run
+through the full dataset five times; rates below use aggregate work divided
+by aggregate elapsed time.
+
+| Implementation / encoding | Tokens per pass | Mean pass time | Tokens/s | Decimal MB/s |
+|---|---:|---:|---:|---:|
+| OWT BPE 32K (`cs336_basics.Tokenizer`, Python) | 66,342,039 | 491.697 s | 134,925 | 0.588 |
+| `tiktoken` 0.12.0 (`gpt2`) | 65,794,501 | 31.211 s | 2,108,028 | 9.267 |
+
+On this machine and workload, `tiktoken` processed the input bytes about
+15.8x faster. This is an implementation-throughput comparison, not a
+tokenizer-quality comparison: the encodings and vocabularies differ, and the
+custom tokenizer is a Python reference implementation while `tiktoken` is
+optimized native code.
+
+Machine/runtime: Intel Core i5-8400 @ 2.80 GHz, six CPUs exposed under WSL2
+(Microsoft hypervisor), Linux 6.18, Python 3.13.16. The benchmark loop was
+sequential and single-process. CPU model, available CPU time, virtualization,
+load, and threading can all affect throughput, so report the hardware and
+benchmark setup when comparing results.
+
+For context, the [OpenAI `tiktoken` README performance section](https://github.com/openai/tiktoken#performance)
+reports `tiktoken` as 3-6x faster than a comparable open-source tokenizer,
+based on 1 GB of text and `GPT2TokenizerFast` (`tokenizers` 0.13.2,
+`transformers` 4.24.0, `tiktoken` 0.2.0). That is not directly comparable to
+this run because the machine, workload, versions, and reference implementation
+differ.
+
 ## Learnings
 
 - Vocabulary reflects corpus domain and cleanliness: clean narrow data gives word-like tokens; noisy web data spends vocab slots on junk runs.
@@ -85,5 +148,3 @@ Mean token length by merge rank:
 ## Next steps
 
 - Count whitespace-run tokens and case/space duplicate token groups in each vocab.
-- Measure bytes/token on the TinyStories and OWT validation sets with each tokenizer.
-- Cross-evaluate: TinyStories tokenizer on OWT and vice versa.
