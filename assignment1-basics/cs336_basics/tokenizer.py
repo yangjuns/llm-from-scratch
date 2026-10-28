@@ -1,15 +1,13 @@
 from collections.abc import Iterable, Iterator
 
 import json
-import re
-
-import cs336_basics.pretokenization as pt
+import regex as re
 
 
 class Tokenizer:
     regex_pattern = (
-        r"'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+[\r\n]*|"
-        r"\s*[\r\n]|\s+(?!\S)|\s+"
+        r"'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|"
+        r"\s+(?!\S)|\s+"
     )
 
     def __init__(
@@ -33,6 +31,21 @@ class Tokenizer:
         )
         # Construct a reverse mapping from token bytes to their IDs for quick lookup
         self.vocab_reverse = {v: k for k, v in self.vocab.items()}
+        self.merge_ranks = {pair: i for i, pair in enumerate(self.merges)}
+        self.special_token_set = set(self.special_tokens)
+        # Longest first so overlapping special tokens match the longer one
+        self.special_pattern = (
+            re.compile(
+                "("
+                + "|".join(
+                    re.escape(t)
+                    for t in sorted(self.special_tokens, key=len, reverse=True)
+                )
+                + ")"
+            )
+            if self.special_tokens
+            else None
+        )
 
     @classmethod
     def from_files(
@@ -71,47 +84,57 @@ class Tokenizer:
 
         return cls(vocab, merges, special_tokens)
 
-    def _merge_token(self, token_bytes: tuple[bytes, ...]) -> bytes:
-        merge_applicable = True
-        while merge_applicable:
-            # Iterate over the tuple of bytes to each if we have any applicable
-            # merges
-            merge_applied = False
-            for i in range(len(token_bytes) - 1):
-                # Check if the current pair of bytes matches any merge rule
-                for left, right in self.merges:
-                    if token_bytes[i] == left and token_bytes[i + 1] == right:
-                        token_bytes = (
-                            token_bytes[:i]
-                            + tuple([left + right])
-                            + token_bytes[i + 2 :]
-                        )
-                        merge_applied = True
-                        break
-                if merge_applied:
-                    break
-            if not merge_applied:
-                merge_applicable = False
-        return b"".join(token_bytes)
+    def _merge_token(self, token_bytes: tuple[bytes, ...]) -> list[bytes]:
+        # Repeatedly apply the earliest-created merge present in the token
+        parts = list(token_bytes)
+        while len(parts) > 1:
+            best_rank = None
+            for i in range(len(parts) - 1):
+                rank = self.merge_ranks.get((parts[i], parts[i + 1]))
+                if rank is not None and (
+                    best_rank is None or rank < best_rank
+                ):
+                    best_rank = rank
+            if best_rank is None:
+                break
+            merged: list[bytes] = []
+            i = 0
+            while i < len(parts):
+                if (
+                    i < len(parts) - 1
+                    and self.merge_ranks.get((parts[i], parts[i + 1]))
+                    == best_rank
+                ):
+                    merged.append(parts[i] + parts[i + 1])
+                    i += 2
+                else:
+                    merged.append(parts[i])
+                    i += 1
+            parts = merged
+        return parts
 
     def encode(self, text: str) -> list[int]:
         """
         Encode an input text into a sequence of token IDs.
         """
-        # Pre-tokenization
-        pre_tokens = pt.pre_tokenize_doc(
-            text,
-            self.special_tokens,
-            regex_pattern=self.regex_pattern,
-        )
-        # Represent
-        token_bytes_list: list[bytes] = [b"" for _ in pre_tokens.keys()]
-        # Apply BPE merge for each token in token_bytes_list
-        for i, token_bytes in enumerate(pre_tokens.keys()):
-            token_bytes_list[i] = self._merge_token(token_bytes)
-        token_ids = [
-            self.vocab_reverse[token_bytes] for token_bytes in token_bytes_list
-        ]
+        token_ids: list[int] = []
+        if self.special_pattern is not None:
+            # The capture group keeps special tokens in the split result
+            segments = self.special_pattern.split(text)
+        else:
+            segments = [text]
+        for segment in segments:
+            if not segment:
+                continue
+            if segment in self.special_token_set:
+                token_ids.append(self.vocab_reverse[segment.encode("utf-8")])
+                continue
+            for match in re.finditer(self.regex_pattern, segment):
+                pre_token = tuple(
+                    bytes([b]) for b in match.group().encode("utf-8")
+                )
+                for part in self._merge_token(pre_token):
+                    token_ids.append(self.vocab_reverse[part])
         return token_ids
 
     def encode_iterable(self, iterable: Iterable[str]) -> Iterator[int]:
@@ -121,21 +144,13 @@ class Tokenizer:
         memory-efficient tokenization of large files that we cannot directly
         load into memory.
         """
-        buffered_text: str = ""
         for text in iterable:
-            # Keep reading the iterable until we hit a special token or the end of
-            # the iterable
-            buffered_text += text
-            # Split on the special tokens
-            segments = re.split("|".join(self.special_tokens), buffered_text)
-            for segment in segments[:-1]:
-                yield from self.encode(segment)
-            buffered_text = segments[-1]
-        if buffered_text:
-            yield from self.encode(buffered_text)
+            yield from self.encode(text)
 
     def decode(self, ids: list[int]) -> str:
         """
         Decode a sequence of token IDs into text.
         """
-        return b"".join(self.vocab[i] for i in ids).decode()
+        return b"".join(self.vocab[i] for i in ids).decode(
+            "utf-8", errors="replace"
+        )
