@@ -1,4 +1,34 @@
-# BPE tokenizer: TinyStories vs OpenWebText
+# BPE tokenizer notes
+
+# Part 1: BPE implementation
+
+## Data structures
+
+- Use a doubly linked list per pre-token for constant-time neighbor lookup.
+  A merge only touches k places, where k is the number of occurrences of the
+  pair, instead of rescanning the whole sequence.
+- Profile with py-spy. It was very useful for finding the real bottleneck.
+- Finding the most frequent pair is the hot spot; optimize it with a max-heap.
+  - A BST can also work, but each merge also changes the counts of
+    neighboring pairs. A BST ordered by count cannot also be keyed by byte
+    pair, so locating and updating an entry is expensive.
+  - Common pattern: max-heap + hash table (pair -> current count) with lazy
+    updates. Push a new entry when a count changes, and when popping, skip
+    entries whose count no longer matches the table.
+  - Amortized O(log k) per update.
+## Saving vocab and merges to JSON: hex vs text
+
+- Storing the hex of the token bytes is lossless: `bytes.fromhex(hex)`
+  recovers the exact bytes.
+- Storing the decoded text is lossy. Tokens are arbitrary byte sequences, and
+  many (e.g. a lone `0xE2` or continuation bytes `0x80`-`0xBF`) are not valid
+  UTF-8 on their own. Decoding them needs `errors="replace"`/`"ignore"`, so
+  different byte sequences can collapse to the same text.
+- Keep `hex` as the source of truth; `text` is only for human inspection.
+- `json.load` on these files returns a list of dicts, so convert to
+  `dict[int, bytes]` and `list[tuple[bytes, bytes]]` after loading.
+
+# Part 2: TinyStories vs OpenWebText
 
 Artifacts (gitignored): `assignment1-basics/artifacts/tinystories_bpe/` (10k vocab) and `assignment1-basics/artifacts/owt_train_bpe/` (32k vocab).
 Comparison is from vocab/merge statistics only; no compression-ratio (bytes/token) measurement yet.
