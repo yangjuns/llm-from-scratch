@@ -143,9 +143,8 @@ class Tokenizer:
         load into memory.
         """
         buffered_text: str = ""
+        max_special_length = max(map(len, self.special_tokens), default=0)
         for text in iterable:
-            # Keep reading the iterable until we hit a special token or the end of
-            # the iterable
             buffered_text += text
             if self.special_pattern is None:
                 last_match_start = None
@@ -155,10 +154,39 @@ class Tokenizer:
                     yield from self.encode(buffered_text[:last_match_start])
                     buffered_text = buffered_text[last_match_start:]
                 continue
-            segments = self.special_pattern.split(buffered_text)
+
+            special_suffix_start = len(buffered_text)
+            for start in range(
+                max(0, len(buffered_text) - max_special_length),
+                len(buffered_text),
+            ):
+                suffix = buffered_text[start:]
+                if any(
+                    token.startswith(suffix) for token in self.special_tokens
+                ):
+                    special_suffix_start = start
+                    break
+
+            processable_text = buffered_text[:special_suffix_start]
+            unresolved_suffix = buffered_text[special_suffix_start:]
+            segments = self.special_pattern.split(processable_text)
             for segment in segments[:-1]:
-                yield from self.encode(segment)
-            buffered_text = segments[-1]
+                if segment in self.special_token_set:
+                    yield self.vocab_reverse[segment.encode("utf-8")]
+                elif segment:
+                    yield from self.encode(segment)
+
+            trailing_segment = segments[-1]
+            last_match_start = None
+            for match in re.finditer(self.regex_pattern, trailing_segment):
+                last_match_start = match.start()
+            if last_match_start is None:
+                buffered_text = trailing_segment + unresolved_suffix
+            else:
+                yield from self.encode(trailing_segment[:last_match_start])
+                buffered_text = (
+                    trailing_segment[last_match_start:] + unresolved_suffix
+                )
         if buffered_text:
             yield from self.encode(buffered_text)
 

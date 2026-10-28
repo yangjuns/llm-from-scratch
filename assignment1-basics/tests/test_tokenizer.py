@@ -403,6 +403,19 @@ def test_encode_iterable_preserves_pretoken_across_chunks():
     assert list(tokenizer.encode_iterable(["a", "b"])) == tokenizer.encode("ab")
 
 
+def test_encode_iterable_with_special_tokens_streams_without_markers():
+    tokenizer = get_tokenizer(
+        {0: b"a", 1: b" ", 2: b"<|special|>"},
+        [],
+        ["<|special|>"],
+    )
+    chunks = iter(["a ", "b"])
+    ids = tokenizer.encode_iterable(chunks)
+
+    assert next(ids) == 0
+    assert next(chunks) == "b"
+
+
 def test_encode_iterable_tinystories_matches_tiktoken():
     reference_tokenizer = tiktoken.get_encoding("gpt2")
     tokenizer = get_tokenizer_from_vocab_merges_path(
