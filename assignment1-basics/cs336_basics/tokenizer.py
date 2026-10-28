@@ -91,9 +91,7 @@ class Tokenizer:
             best_rank = None
             for i in range(len(parts) - 1):
                 rank = self.merge_ranks.get((parts[i], parts[i + 1]))
-                if rank is not None and (
-                    best_rank is None or rank < best_rank
-                ):
+                if rank is not None and (best_rank is None or rank < best_rank):
                     best_rank = rank
             if best_rank is None:
                 break
@@ -144,8 +142,21 @@ class Tokenizer:
         memory-efficient tokenization of large files that we cannot directly
         load into memory.
         """
+        buffered_text: str = ""
         for text in iterable:
-            yield from self.encode(text)
+            # Keep reading the iterable until we hit a special token or the end of
+            # the iterable
+            buffered_text += text
+            if self.special_pattern is None:
+                yield from self.encode(buffered_text)
+                buffered_text = ""
+                continue
+            segments = self.special_pattern.split(buffered_text)
+            for segment in segments[:-1]:
+                yield from self.encode(segment)
+            buffered_text = segments[-1]
+        if buffered_text:
+            yield from self.encode(buffered_text)
 
     def decode(self, ids: list[int]) -> str:
         """
