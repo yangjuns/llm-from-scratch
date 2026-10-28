@@ -1,6 +1,7 @@
 from collections.abc import Iterable, Iterator
 
 import json
+import re
 
 import cs336_basics.pretokenization as pt
 
@@ -120,8 +121,18 @@ class Tokenizer:
         memory-efficient tokenization of large files that we cannot directly
         load into memory.
         """
+        buffered_text: str = ""
         for text in iterable:
-            yield from self.encode(text)
+            # Keep reading the iterable until we hit a special token or the end of
+            # the iterable
+            buffered_text += text
+            # Split on the special tokens
+            segments = re.split("|".join(self.special_tokens), buffered_text)
+            for segment in segments[:-1]:
+                yield from self.encode(segment)
+            buffered_text = segments[-1]
+        if buffered_text:
+            yield from self.encode(buffered_text)
 
     def decode(self, ids: list[int]) -> str:
         """
