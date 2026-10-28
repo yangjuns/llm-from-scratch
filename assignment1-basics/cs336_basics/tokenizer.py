@@ -30,7 +30,15 @@ class Tokenizer:
             special_tokens if special_tokens is not None else []
         )
         # Construct a reverse mapping from token bytes to their IDs for quick lookup
+        self.vocab = self.vocab.copy()
         self.vocab_reverse = {v: k for k, v in self.vocab.items()}
+        next_token_id = max(self.vocab, default=-1) + 1
+        for special_token in self.special_tokens:
+            token_bytes = special_token.encode("utf-8")
+            if token_bytes not in self.vocab_reverse:
+                self.vocab[next_token_id] = token_bytes
+                self.vocab_reverse[token_bytes] = next_token_id
+                next_token_id += 1
         self.merge_ranks = {pair: i for i, pair in enumerate(self.merges)}
         self.special_token_set = set(self.special_tokens)
         # Longest first so overlapping special tokens match the longer one
