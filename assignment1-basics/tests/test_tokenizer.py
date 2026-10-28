@@ -394,6 +394,15 @@ def test_encode_iterable_tinystories_sample_roundtrip():
     assert tokenizer.decode(all_ids) == corpus_contents
 
 
+def test_encode_iterable_preserves_pretoken_across_chunks():
+    tokenizer = get_tokenizer(
+        {0: b"a", 1: b"b", 2: b"ab"},
+        [(b"a", b"b")],
+    )
+
+    assert list(tokenizer.encode_iterable(["a", "b"])) == tokenizer.encode("ab")
+
+
 def test_encode_iterable_tinystories_matches_tiktoken():
     reference_tokenizer = tiktoken.get_encoding("gpt2")
     tokenizer = get_tokenizer_from_vocab_merges_path(

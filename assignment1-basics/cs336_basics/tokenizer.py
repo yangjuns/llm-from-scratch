@@ -148,8 +148,12 @@ class Tokenizer:
             # the iterable
             buffered_text += text
             if self.special_pattern is None:
-                yield from self.encode(buffered_text)
-                buffered_text = ""
+                last_match_start = None
+                for match in re.finditer(self.regex_pattern, buffered_text):
+                    last_match_start = match.start()
+                if last_match_start is not None:
+                    yield from self.encode(buffered_text[:last_match_start])
+                    buffered_text = buffered_text[last_match_start:]
                 continue
             segments = self.special_pattern.split(buffered_text)
             for segment in segments[:-1]:
