@@ -9,7 +9,7 @@ from cs336_basics import bpe
 from cs336_basics import pretokenization
 
 SPECIAL_TOKEN = "<|endoftext|>"
-NUM_PROCESSES = 4
+NUM_PROCESSES = 6
 PRE_TOKEN_PATTERN = (
     r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+|"""
     r""" ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
@@ -40,22 +40,31 @@ def _token_record(token: bytes) -> dict[str, str]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Train a byte-level BPE tokenizer on TinyStories."
+        description="Train a byte-level BPE tokenizer on a text corpus."
     )
     parser.add_argument(
-        "input_path", type=Path, help="Path to the TinyStories text file"
+        "input_path", type=Path, help="Path to the training text file"
     )
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("artifacts/tinystories_bpe"),
+        default=Path("artifacts/bpe"),
         help="Directory for the serialized vocabulary and merges",
     )
+    parser.add_argument("--vocab-size", type=int, default=10_000)
+    parser.add_argument(
+        "--num-processes",
+        type=int,
+        default=NUM_PROCESSES,
+        help=f"Number of processes for pre-tokenization (default: {NUM_PROCESSES})",
+    )
     args = parser.parse_args()
+    if args.num_processes < 1:
+        parser.error("--num-processes must be at least 1")
 
     with args.input_path.open("rb") as f:
         boundaries = pretokenization.find_chunk_boundaries(
-            f, NUM_PROCESSES, SPECIAL_TOKEN.encode("utf-8")
+            f, args.num_processes, SPECIAL_TOKEN.encode("utf-8")
         )
 
     tasks = [
@@ -63,14 +72,14 @@ def main() -> None:
         for start, end in zip(boundaries[:-1], boundaries[1:])
     ]
     pre_token_counts: dict[tuple[bytes, ...], int] = {}
-    with ProcessPoolExecutor(max_workers=NUM_PROCESSES) as executor:
+    with ProcessPoolExecutor(max_workers=args.num_processes) as executor:
         for chunk_counts in executor.map(_pretokenize_chunk, tasks):
             for token, count in chunk_counts.items():
                 pre_token_counts[token] = pre_token_counts.get(token, 0) + count
 
     vocab, merges = bpe.bpe_train(
         pre_token_counts=pre_token_counts,
-        target_vocab_size=10_000,
+        target_vocab_size=args.vocab_size,
         special_tokens=[SPECIAL_TOKEN],
     )
 
