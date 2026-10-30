@@ -13,11 +13,7 @@ from torch import Tensor
 import cs336_basics.pretokenization as pt
 import cs336_basics.bpe as bpe
 from cs336_basics.tokenizer import Tokenizer
-from cs336_basics.linear import Linear
-from cs336_basics.embedding import Embedding
-from cs336_basics.rms_norm import RMSNorm
-from cs336_basics.swiglu_ff import SwiGLUFF
-from cs336_basics.rope import RoPE
+from cs336_basics import llm
 
 
 def run_linear(
@@ -38,7 +34,7 @@ def run_linear(
     Returns:
         Float[Tensor, "... d_out"]: The transformed output of your linear module.
     """
-    linear = Linear(d_in, d_out)
+    linear = llm.Linear(d_in, d_out)
     linear.load_state_dict({"weights": weights})
     return linear(in_features)
 
@@ -61,7 +57,7 @@ def run_embedding(
     Returns:
         Float[Tensor, "... d_model"]: Batch of embeddings returned by your Embedding layer.
     """
-    embedding = Embedding(vocab_size, d_model)
+    embedding = llm.Embedding(vocab_size, d_model)
     embedding.load_state_dict({"weights": weights})
     return embedding(token_ids)
 
@@ -88,7 +84,7 @@ def run_swiglu(
     Returns:
         Float[Tensor, "... d_model"]: Output embeddings of the same shape as the input embeddings.
     """
-    swiglu = SwiGLUFF(d_model, d_ff)
+    swiglu = llm.SwiGLUFF(d_model, d_ff)
     swiglu.load_state_dict(
         {
             "linear1.weights": w1_weight,
@@ -213,7 +209,7 @@ def run_rope(
     Returns:
         Float[Tensor, " ... sequence_length d_k"]: Tensor with RoPEd input.
     """
-    rope = RoPE(
+    rope = llm.RoPE(
         theta=theta,
         d_k=d_k,
         max_seq_len=max_seq_len,
@@ -397,7 +393,7 @@ def run_rmsnorm(
         Float[Tensor,"... d_model"]: Tensor of with the same shape as `in_features` with the output of running
         RMSNorm of the `in_features`.
     """
-    rms_norm = RMSNorm(d_model, eps)
+    rms_norm = llm.RMSNorm(d_model, eps)
     rms_norm.load_state_dict({"weights": weights})
     return rms_norm(in_features)
 
