@@ -3,7 +3,11 @@ import torch
 
 class RMSNorm(torch.nn.Module):
     def __init__(
-        self, d_model: int, eps: float = 1e-5, device=None, dtype=None
+        self,
+        d_model: int,
+        eps: float = 1e-5,
+        device: torch.device | str | None = None,
+        dtype: torch.dtype | None = None,
     ):
         """
         Args:
@@ -17,7 +21,9 @@ class RMSNorm(torch.nn.Module):
         super().__init__()
         self.d_model = d_model
         self.eps = eps
-        self.weights = torch.nn.Parameter(torch.ones(d_model))
+        self.weights = torch.nn.Parameter(
+            torch.ones(d_model, device=device, dtype=dtype)
+        )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         in_type = x.dtype
