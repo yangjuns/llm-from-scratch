@@ -16,6 +16,7 @@ from cs336_basics.tokenizer import Tokenizer
 from cs336_basics.linear import Linear
 from cs336_basics.embedding import Embedding
 from cs336_basics.rms_norm import RMSNorm
+from cs336_basics.swiglu_ff import SwiGLUFF
 
 
 def run_linear(
@@ -38,7 +39,7 @@ def run_linear(
     """
     linear = Linear(d_in, d_out)
     linear.load_state_dict({"weights": weights})
-    return linear.forward(in_features)
+    return linear(in_features)
 
 
 def run_embedding(
@@ -61,7 +62,7 @@ def run_embedding(
     """
     embedding = Embedding(vocab_size, d_model)
     embedding.load_state_dict({"weights": weights})
-    return embedding.forward(token_ids)
+    return embedding(token_ids)
 
 
 def run_swiglu(
@@ -86,14 +87,15 @@ def run_swiglu(
     Returns:
         Float[Tensor, "... d_model"]: Output embeddings of the same shape as the input embeddings.
     """
-    # Example:
-    # If your state dict keys match, you can use `load_state_dict()`
-    # swiglu.load_state_dict(weights)
-    # You can also manually assign the weights
-    # swiglu.w1.weight.data = w1_weight
-    # swiglu.w2.weight.data = w2_weight
-    # swiglu.w3.weight.data = w3_weight
-    raise NotImplementedError
+    swiglu = SwiGLUFF(d_model, d_ff)
+    swiglu.load_state_dict(
+        {
+            "linear1.weights": w1_weight,
+            "linear2.weights": w2_weight,
+            "linear3.weights": w3_weight,
+        }
+    )
+    return swiglu(in_features)
 
 
 def run_scaled_dot_product_attention(
@@ -390,7 +392,7 @@ def run_rmsnorm(
     """
     rms_norm = RMSNorm(d_model, eps)
     rms_norm.load_state_dict({"weights": weights})
-    return rms_norm.forward(in_features)
+    return rms_norm(in_features)
 
 
 def run_silu(in_features: Float[Tensor, " ..."]) -> Float[Tensor, " ..."]:
