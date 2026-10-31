@@ -1,7 +1,7 @@
 import torch
 import math
 
-from einops import einsum
+from einops import einsum, rearrange
 
 
 class Linear(torch.nn.Module):
@@ -230,3 +230,74 @@ def scaled_dot_product_attention(
         sm, value, "... queries keys, ... keys values -> ... queries values"
     )
     return attention
+
+
+class MultiHeadSelfAttention(torch.nn.Module):
+    def __init__(
+        self,
+        d_model: int,
+        num_heads: int,
+        enable_rope: bool = False,
+        rope_theta: float | None = None,
+        max_seq_len: int | None = None,
+        token_positions: torch.Tensor | None = None,
+        device: torch.device | None = None,
+        dtype: torch.dtype | None = None,
+    ):
+        super().__init__()
+        self.d_model = d_model
+        self.num_heads = num_heads
+        self.dk = d_model // num_heads
+        self.enable_rope = enable_rope
+        if enable_rope:
+            assert rope_theta is not None
+            assert max_seq_len is not None
+            assert token_positions is not None
+            self.rope = RoPE(
+                theta=rope_theta,
+                d_k=self.dk,
+                max_seq_len=max_seq_len,
+                device=device,
+                dtype=dtype,
+            )
+            # Need to add a head dimention to the token_positions
+            self.token_positions = token_positions.unsqueeze(-2)
+        # weights
+        self.weights_q = Linear(d_model, d_model)
+        self.weights_k = Linear(d_model, d_model)
+        self.weights_v = Linear(d_model, d_model)
+        self.weights_o = Linear(d_model, d_model)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        x: (..., seq, d_model)
+        """
+        Q = self.weights_q(x)
+        q_heads = rearrange(
+            Q, "... seq (h dk) -> ... h seq dk", h=self.num_heads
+        )
+        K = self.weights_k(x)
+        k_heads = rearrange(
+            K, "... seq (h dk) -> ... h seq dk", h=self.num_heads
+        )
+        V = self.weights_v(x)
+        v_heads = rearrange(
+            V, "... seq (h dk) -> ... h seq dk", h=self.num_heads
+        )
+
+        # Applying RoPE to Q and K
+        if self.enable_rope:
+            q_heads = self.rope(q_heads, self.token_positions)
+            k_heads = self.rope(k_heads, self.token_positions)
+
+        # create masks
+        seq_len = x.shape[-2]
+        mask = torch.tril(torch.ones(seq_len, seq_len, device=x.device)).bool()
+
+        y = scaled_dot_product_attention(q_heads, k_heads, v_heads, mask=mask)
+        # y has shape (..., h seq dv)
+        attention_concat = rearrange(
+            y, "... h seq dv -> ... seq (h dv)", h=self.num_heads
+        )
+
+        return self.weights_o(attention_concat)

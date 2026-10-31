@@ -172,6 +172,36 @@ Examples (`->` is the result shape):
 - Broadcasting never changes data; it just reuses it. Output shape comes from
   the rule above, so you can predict it before running.
 
+### `tensor.unsqueeze(dim)`
+
+Inserts a size-1 axis at position `dim`. Data is unchanged; only the shape
+changes. `x.unsqueeze(d)` is the same as indexing with `None` at that spot.
+
+```python
+t = torch.zeros(8, 5)      # (8, 5)
+t.unsqueeze(0).shape       # (1, 8, 5)   same as t[None]
+t.unsqueeze(1).shape       # (8, 1, 5)   same as t[:, None]
+t.unsqueeze(-1).shape      # (8, 5, 1)   same as t[..., None]
+t.unsqueeze(-2).shape      # (8, 1, 5)   -2 = just before the last axis
+```
+
+- `dim` is the index the **new** axis will have in the result. Negative values
+  count from the end of the *result*, so `-1` appends and `-2` inserts before
+  the last axis.
+- `squeeze(dim)` is the inverse: removes a size-1 axis.
+- Typical use: make a tensor broadcast against one with an extra axis.
+
+RoPE example: `q_heads` is `(batch, heads, seq, d_k)` but `token_positions`
+is `(batch, seq)`. Add a head axis so the cached cos/sin broadcast over heads:
+
+```python
+pos = token_positions.unsqueeze(-2)   # (batch, 1, seq)
+cos = self.cos_cached[pos]            # (batch, 1, seq, d_k/2)
+# (batch, 1, seq, d_k/2) * (batch, heads, seq, d_k/2) -> broadcasts over heads
+```
+
+If `token_positions` already has the head axis, don't unsqueeze again.
+
 ### Debugging shape errors
 
 1. Write both shapes, right-aligned, one above the other.
@@ -278,6 +308,87 @@ out = out.flatten(-2)                           # (..., seq_len, d_k)
   wrong layout.
 - The order matters: later layers and weights assume each feature index keeps
   its meaning.
+
+## `einops.rearrange`
+
+Reshapes/permutes axes using a named pattern. Parentheses group (merge) or
+split axes; the data order follows row-major, like `reshape`.
+
+```python
+from einops import rearrange
+
+# split features into heads: (..., seq, d_model) -> (..., h, seq, d_k)
+q = rearrange(q, "... seq (h d_k) -> ... h seq d_k", h=num_heads)
+
+# merge heads back: (..., h, seq, d_v) -> (..., seq, h*d_v)
+out = rearrange(out, "... h seq d_v -> ... seq (h d_v)")
+```
+
+- When splitting `(h d_k)`, give one of the sizes (e.g. `h=`); the other is
+  inferred.
+- Reordering axes (`h seq` vs `seq h`) is a permute, not just a reshape.
+- The head axis becomes an extra batch dim, so single-head attention code
+  with `...` works unchanged.
+
+## `tensor.masked_fill(mask, value)`
+
+Returns a copy where positions with `mask == True` are replaced by `value`;
+everything else is kept. The mask must be boolean and broadcastable.
+
+```python
+x = torch.tensor([1., 2., 3.])
+m = torch.tensor([True, False, True])
+x.masked_fill(m, 0.)   # tensor([0., 2., 0.])
+```
+
+- Attention mask: `True` means "allowed", but `masked_fill` replaces the
+  `True` positions, so invert it with `~mask` (logical NOT):
+
+  ```python
+  scores = scores.masked_fill(~mask, -torch.inf)
+  ```
+
+- After softmax, `exp(-inf) = 0`, so masked positions get zero weight.
+- Don't use `mask * -torch.inf`: `0 * -inf = nan`.
+- `masked_fill_` is the in-place version.
+
+## `torch.triu` / `torch.tril`
+
+`triu(input, diagonal=0)` keeps the **upper** triangle and zeros the rest;
+`tril` keeps the **lower** triangle.
+
+```python
+a = torch.ones(3, 3)
+torch.triu(a)               # [[1,1,1],[0,1,1],[0,0,1]]
+torch.triu(a, diagonal=1)   # [[0,1,1],[0,0,1],[0,0,0]]  main diagonal excluded
+```
+
+- `diagonal=0` is the main diagonal, `>0` shifts up, `<0` shifts down.
+- Causal mask (`True` = allowed; position `i` sees `j <= i`):
+
+  ```python
+  mask = torch.tril(torch.ones(n, n, dtype=torch.bool))
+  # equivalent: mask = ~torch.triu(torch.ones(n, n, dtype=torch.bool), diagonal=1)
+  ```
+
+- The `triu` form marks the future positions (strict upper triangle), then
+  `~` flips it.
+
+## `tensor.bool()`
+
+Casts a tensor to dtype `torch.bool`: `0` becomes `False`, any nonzero value
+becomes `True`. It returns a new tensor (same as `.to(torch.bool)`).
+
+```python
+torch.tensor([0, 1, 2, -3]).bool()   # [False, True, True, True]
+torch.tril(torch.ones(3, 3)).bool()  # lower triangle True
+```
+
+- `masked_fill` and `~` need a boolean mask; `~` on an int tensor is a
+  bitwise NOT (`~1 = -2`), not a logical one.
+- Prefer building the mask directly with `dtype=torch.bool`, as in
+  `torch.ones(n, n, dtype=torch.bool)`, to avoid the extra cast.
+- `torch.bool` is also the result dtype of comparisons like `x > 0`.
 
 ## `nn.Module`
 
