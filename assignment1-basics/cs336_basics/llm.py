@@ -186,3 +186,13 @@ class RoPE(torch.nn.Module):
         x_rotated = x_rotated.flatten(-2)  # (..., seq_len, d_k)
 
         return x_rotated
+
+
+def softmax(x: torch.Tensor, dim: int) -> torch.Tensor:
+    """
+    Apply softmax along the given dimension.
+    """
+    x_reduced = x - x.max(dim=dim, keepdim=True).values
+    return torch.exp(x_reduced) / torch.sum(
+        torch.exp(x_reduced), dim=dim, keepdim=True
+    )
