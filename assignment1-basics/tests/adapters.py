@@ -305,7 +305,37 @@ def run_transformer_block(
         Float[Tensor, "batch sequence_length d_model"] Tensor with the output of
         running the Transformer block on the input features while using RoPE.
     """
-    raise NotImplementedError
+    # Build the token position tensor
+    batch, seq = in_features.shape[:2]
+    positions = torch.arange(seq, device=in_features.device)
+    token_positions = positions.unsqueeze(0).expand(batch, seq)
+    transformer = llm.TransformerBlock(
+        d_model, num_heads, d_ff, max_seq_len, theta
+    )
+    transformer.norm1.load_state_dict({"weights": weights["ln1.weight"]})
+    transformer.norm2.load_state_dict({"weights": weights["ln2.weight"]})
+    transformer.attention.weights_q.load_state_dict(
+        {"weights": weights["attn.q_proj.weight"]}
+    )
+    transformer.attention.weights_k.load_state_dict(
+        {"weights": weights["attn.k_proj.weight"]}
+    )
+    transformer.attention.weights_v.load_state_dict(
+        {"weights": weights["attn.v_proj.weight"]}
+    )
+    transformer.attention.weights_o.load_state_dict(
+        {"weights": weights["attn.output_proj.weight"]}
+    )
+    transformer.feed_forward.linear1.load_state_dict(
+        {"weights": weights["ffn.w1.weight"]}
+    )
+    transformer.feed_forward.linear2.load_state_dict(
+        {"weights": weights["ffn.w2.weight"]}
+    )
+    transformer.feed_forward.linear3.load_state_dict(
+        {"weights": weights["ffn.w3.weight"]}
+    )
+    return transformer(in_features, token_positions)
 
 
 def run_transformer_lm(

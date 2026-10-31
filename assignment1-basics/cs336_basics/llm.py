@@ -240,7 +240,6 @@ class MultiHeadSelfAttention(torch.nn.Module):
         enable_rope: bool = False,
         rope_theta: float | None = None,
         max_seq_len: int | None = None,
-        token_positions: torch.Tensor | None = None,
         device: torch.device | None = None,
         dtype: torch.dtype | None = None,
     ):
@@ -252,7 +251,6 @@ class MultiHeadSelfAttention(torch.nn.Module):
         if enable_rope:
             assert rope_theta is not None
             assert max_seq_len is not None
-            assert token_positions is not None
             self.rope = RoPE(
                 theta=rope_theta,
                 d_k=self.dk,
@@ -260,15 +258,15 @@ class MultiHeadSelfAttention(torch.nn.Module):
                 device=device,
                 dtype=dtype,
             )
-            # Need to add a head dimention to the token_positions
-            self.token_positions = token_positions.unsqueeze(-2)
         # weights
         self.weights_q = Linear(d_model, d_model)
         self.weights_k = Linear(d_model, d_model)
         self.weights_v = Linear(d_model, d_model)
         self.weights_o = Linear(d_model, d_model)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(
+        self, x: torch.Tensor, token_positions: torch.Tensor | None = None
+    ) -> torch.Tensor:
         """
         x: (..., seq, d_model)
         """
@@ -286,9 +284,11 @@ class MultiHeadSelfAttention(torch.nn.Module):
         )
 
         # Applying RoPE to Q and K
-        if self.enable_rope:
-            q_heads = self.rope(q_heads, self.token_positions)
-            k_heads = self.rope(k_heads, self.token_positions)
+        if self.enable_rope and token_positions is not None:
+            # Need to add a head dimention to the token_positions
+            token_positions = token_positions.unsqueeze(-2)
+            q_heads = self.rope(q_heads, token_positions)
+            k_heads = self.rope(k_heads, token_positions)
 
         # create masks
         seq_len = x.shape[-2]
@@ -301,3 +301,51 @@ class MultiHeadSelfAttention(torch.nn.Module):
         )
 
         return self.weights_o(attention_concat)
+
+
+class TransformerBlock(torch.nn.Module):
+    def __init__(
+        self,
+        d_model: int,
+        num_heads: int,
+        d_ff: int,
+        max_seq_len: int,
+        theta: float,
+        device: torch.device | None = None,
+        dtype: torch.dtype | None = None,
+    ):
+        super().__init__()
+        self.d_model = d_model
+        self.num_heads = num_heads
+        self.d_ff = d_ff
+        self.max_seq_len = max_seq_len
+        self.theta = theta
+        # Block components
+        self.norm1 = RMSNorm(d_model, device=device, dtype=dtype)
+        self.attention = MultiHeadSelfAttention(
+            d_model,
+            num_heads,
+            True,
+            theta,
+            max_seq_len,
+            device,
+            dtype,
+        )
+        self.norm2 = RMSNorm(d_model, device=device, dtype=dtype)
+        self.feed_forward = SwiGLUFF(d_model, d_ff, device, dtype)
+
+    def forward(
+        self, x: torch.Tensor, token_positions: torch.Tensor
+    ) -> torch.Tensor:
+        """
+        Forward pass of the Transformer block.
+
+        Args:
+            x (torch.Tensor): Input tensor of shape (batch, seq, d_model).
+            token_positions (torch.Tensor): Tensor containing the positions of tokens in the sequence.
+
+        Returns:
+            torch.Tensor: Output tensor of shape (batch, seq, d_model).
+        """
+        y = x + self.attention(self.norm1(x), token_positions)
+        return y + self.feed_forward(self.norm2(y))

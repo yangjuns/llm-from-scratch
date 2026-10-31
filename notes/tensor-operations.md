@@ -202,6 +202,55 @@ cos = self.cos_cached[pos]            # (batch, 1, seq, d_k/2)
 
 If `token_positions` already has the head axis, don't unsqueeze again.
 
+### `tensor.expand(*sizes)`
+
+Broadcasts a tensor to a bigger shape **without copying**. The result is a
+view: the stretched axis has stride 0, so every position reuses the same data.
+
+```python
+t = torch.arange(4)         # (4,)  values 0 1 2 3
+t.expand(2, 4).shape        # (2, 4)  each row is [0, 1, 2, 3]
+t.expand(2, 4).stride()     # (0, 1)  stride 0 on the new axis: no copy
+t.expand((2, 4)).shape      # a shape tuple also works (e.g. x.shape[:-1])
+```
+
+Rules:
+
+- Existing axes are aligned from the **right** (same as broadcasting). New
+  axes can only be added on the **left**.
+- A size-1 axis can stretch to any size. Any other axis must stay the same
+  size, otherwise error: `t.expand(2, 5)` on `(4,)` fails.
+- `-1` means "keep this size": `x.expand(-1, 5, -1)` on `(2, 1, 3)` is
+  `(2, 5, 3)`. `-1` is not allowed for new leading axes.
+- To add a **trailing** or middle axis, `unsqueeze` first:
+  `t.unsqueeze(-1).expand(4, 3)` is `(4, 3)`.
+
+Because the data is shared:
+
+- Writing in place to an expanded tensor is unsafe (many positions alias one
+  element, so PyTorch may error or give surprising results). Use `.clone()`
+  or `.repeat(...)` to get real, independent memory.
+- Reading and doing math on it is fine and cheap.
+
+`expand` vs. broadcasting vs. `repeat`:
+
+| | Copies data? | Use when |
+| --- | --- | --- |
+| Implicit broadcasting (`a * b`) | no | Elementwise ops; shapes just need to be compatible |
+| `expand` | no | You need an explicit tensor of the full shape (e.g. to index with or pass to a function) |
+| `repeat` | yes | You need independent memory |
+
+Example (token positions for RoPE): `arange` supplies the values, and
+`expand` lays them out across the batch.
+
+```python
+seq_len = x.shape[-2]                                   # x: (batch, seq, d_model)
+pos = torch.arange(seq_len).expand(x.shape[:-1])        # (batch, seq)
+```
+
+`x.shape[:-1]` is only the *shape* `(batch, seq)`; the values come from
+`arange`.
+
 ### Debugging shape errors
 
 1. Write both shapes, right-aligned, one above the other.
