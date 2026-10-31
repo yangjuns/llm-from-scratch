@@ -198,13 +198,12 @@ def run_multihead_self_attention_with_rope(
         True,
         theta,
         max_seq_len,
-        token_positions=token_positions,
     )
     attention.weights_q.load_state_dict({"weights": q_proj_weight})
     attention.weights_k.load_state_dict({"weights": k_proj_weight})
     attention.weights_v.load_state_dict({"weights": v_proj_weight})
     attention.weights_o.load_state_dict({"weights": o_proj_weight})
-    return attention(in_features)
+    return attention(in_features, token_positions)
 
 
 def run_rope(
@@ -417,7 +416,37 @@ def run_transformer_lm(
         Float[Tensor, "batch_size sequence_length vocab_size"]: Tensor with the predicted unnormalized
         next-word distribution for each token.
     """
-    raise NotImplementedError
+    model = llm.TransformerLM(
+        vocab_size,
+        context_length,
+        d_model,
+        num_layers,
+        num_heads,
+        d_ff,
+        rope_theta,
+    )
+    state_dict = {
+        "token_embeddings.weight": weights["token_embeddings.weight"],
+        "ln_final.weights": weights["ln_final.weight"],
+        "lm_head.weights": weights["lm_head.weight"],
+    }
+    # Map reference names to this implementation's parameter names.
+    block_names = {
+        "ln1.weight": "norm1.weights",
+        "ln2.weight": "norm2.weights",
+        "attn.q_proj.weight": "attention.weights_q.weights",
+        "attn.k_proj.weight": "attention.weights_k.weights",
+        "attn.v_proj.weight": "attention.weights_v.weights",
+        "attn.output_proj.weight": "attention.weights_o.weights",
+        "ffn.w1.weight": "feed_forward.linear1.weights",
+        "ffn.w2.weight": "feed_forward.linear2.weights",
+        "ffn.w3.weight": "feed_forward.linear3.weights",
+    }
+    for i in range(num_layers):
+        for ref_name, name in block_names.items():
+            state_dict[f"layers.{i}.{name}"] = weights[f"layers.{i}.{ref_name}"]
+    model.load_state_dict(state_dict)
+    return model(in_indices)
 
 
 def run_rmsnorm(

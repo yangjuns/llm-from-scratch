@@ -42,6 +42,42 @@
 - Guards against underflow of `x²` in fp16/bf16 (another reason to upcast).
 - Negligible for normal-sized activations.
 
+### RMSNorm vs. LayerNorm
+
+Both normalize each token's feature vector over `d_model`. RMSNorm skips the
+mean-centering and the bias.
+
+LayerNorm:
+
+$$y = \frac{x-\mu}{\sqrt{\sigma^2+\epsilon}}\odot g + b,\quad
+\mu=\tfrac1d\sum x_i,\ \sigma^2=\tfrac1d\sum (x_i-\mu)^2$$
+
+RMSNorm:
+
+$$y = \frac{x}{\sqrt{\tfrac1d\sum x_i^2+\epsilon}}\odot g$$
+
+| | LayerNorm | RMSNorm |
+| --- | --- | --- |
+| Subtracts mean | yes | no |
+| Learned parameters | gain and bias (`2d`) | gain only (`d`) |
+| Statistics computed | mean and variance | mean of squares only |
+| Output mean | ~0 (before `b`) | not forced to 0 |
+
+- RMSNorm is cheaper (fewer ops and parameters) and performs about as well.
+  The RMSNorm paper argues re-scaling is what stabilizes training and
+  re-centering adds little. LLaMA and most recent LLMs use it.
+- If the mean of `x` is already near 0, the two are almost identical, since
+  then variance ≈ mean of squares.
+
+### Why RMSNorm is named `ln`
+
+- `ln` = layer norm. GPT-2 and the original Transformer use LayerNorm, with
+  names like `ln_1`, `ln_2`, `ln_f`. Many models kept `ln` after switching to
+  RMSNorm, since it is a simplified layer norm.
+- The assignment fixtures use `ln1.weight`, `ln2.weight`, `ln_final.weight`.
+- The name has no effect on behavior. It only matters that it matches the
+  state-dict keys the adapter loads.
+
 ## Linear layer: why no bias
 
 - Modern LLMs (LLaMA, PaLM, the assignment architecture) omit biases.
@@ -239,3 +275,43 @@ $$
   trained length degrades quality. Long-context models raise $\Theta$ (e.g.
   LLaMA 3 uses $500{,}000$) or use RoPE scaling (position interpolation, NTK,
   YaRN).
+
+### Why `token_positions` is an input (custom positions)
+
+Positions are separate data: `x` only tells you `seq_len`, not which positions
+its tokens occupy. So `RoPE.forward(x, token_positions)` takes them as input,
+with shape `(..., seq_len)` and integer values in $[0, L)$ (any order, repeats
+allowed).
+
+Use cases where tokens are not "positions $0..n-1$ of one sequence":
+
+1. **Generation with a KV cache** (most common). Only the new token is fed, so
+   `x` has `seq=1`, but its position is $t$ (the cache length), not 0. Cached
+   keys already carry their own rotations, so the new query must use $t$.
+2. **Chunked or continued processing.** A second chunk of a long text starts
+   at its offset, e.g. `[512, 513, ...]`.
+3. **Packed sequences.** Several short documents share one row to avoid
+   padding. Positions restart at each boundary, e.g. `[0,1,2,3, 0,1,2, 0,1]`
+   (usually with a mask blocking cross-document attention).
+4. **Left-padded batches.** Positions are shifted so the first real token gets
+   position 0, e.g. `[0,0,0,0,1,2,3]`.
+5. **Context-extension tricks.** Position interpolation, skipping, or
+   remapping use scaled or non-consecutive positions on purpose.
+6. **Per-example layouts.** Each batch row can have its own positions, which
+   is why the shape is `(..., seq)` and not just `(seq,)`.
+
+Plain pretraining (full sequences starting at 0) needs none of these, so
+`torch.arange(seq_len)` is enough. A reasonable design is
+`token_positions=None` defaulting to `arange(seq_len)`; a passed-in value
+always wins.
+
+Multi-head does not change the position **values**: every head's $q$ and $k$
+are rotated by the same position of its token. It only changes the **shape**:
+after splitting heads, $q$ is `(batch, heads, seq, d_k)`, so positions
+`(batch, seq)` need a head axis (`unsqueeze(-2)`) to broadcast. A `(seq,)`
+tensor broadcasts without it.
+
+Why not store positions on the module at construction: they describe the
+input, not the model. A stored tensor fixes the sequence length and batch
+shape, breaks on truncated or longer inputs, and can't express any case above.
+Pass them in `forward` (or default them there).
