@@ -103,6 +103,10 @@ class RMSNorm(torch.nn.Module):
         return (x_normed * self.weights).to(in_type)
 
 
+def silu(x: torch.Tensor) -> torch.Tensor:
+    return x * torch.sigmoid(x)
+
+
 class SwiGLUFF(torch.nn.Module):
     def __init__(
         self,
@@ -124,7 +128,7 @@ class SwiGLUFF(torch.nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         a = self.linear1(x)
-        return self.linear2(a * torch.sigmoid(a) * self.linear3(x))
+        return self.linear2(silu(a) * self.linear3(x))
 
 
 class RoPE(torch.nn.Module):
