@@ -1,4 +1,6 @@
 import torch
+import math
+
 from einops import einsum
 
 
@@ -190,9 +192,41 @@ class RoPE(torch.nn.Module):
 
 def softmax(x: torch.Tensor, dim: int) -> torch.Tensor:
     """
-    Apply softmax along the given dimension.
+    Apply softmax along the given dimension. This doens't change the shape of
+    the tensor.
     """
     x_reduced = x - x.max(dim=dim, keepdim=True).values
     return torch.exp(x_reduced) / torch.sum(
         torch.exp(x_reduced), dim=dim, keepdim=True
     )
+
+
+def scaled_dot_product_attention(
+    query: torch.Tensor,
+    key: torch.Tensor,
+    value: torch.Tensor,
+    mask: torch.Tensor | None,
+) -> torch.Tensor:
+    """
+    query: shape (batch_size, ..., seq_len, dk)
+    key: (batch_size, ..., seq_len, dk)
+    value: (batch, ..., seq_len, dv)
+    mask: (seq_len, seq_len) - A matrix of True and False. Row i of the matrix
+    indiciates which key the query i should attend to. [i,j] = True means query
+    i should attend to key j.
+    """
+    dk: int = query.shape[-1]
+    # dot product shape (batch, ..., queries_len, keys_len)
+    dot_product: torch.Tensor = einsum(
+        query, key, "... queries dk, ... keys dk -> ... queries keys"
+    )
+    pre_softmax = dot_product / math.sqrt(dk)
+    # Apply mask
+    if mask is not None:
+        pre_softmax = pre_softmax.masked_fill(~mask, -torch.inf)
+
+    sm = softmax(pre_softmax, dim=-1)
+    attention = einsum(
+        sm, value, "... queries keys, ... keys values -> ... queries values"
+    )
+    return attention
