@@ -196,7 +196,7 @@ class RoPE(torch.nn.Module):
 
 def softmax(x: torch.Tensor, dim: int) -> torch.Tensor:
     """
-    Apply softmax along the given dimension. This doens't change the shape of
+        Apply softmax along the given dimension. This doesn't change the shape of
     the tensor.
     """
     x_reduced = x - x.max(dim=dim, keepdim=True).values
