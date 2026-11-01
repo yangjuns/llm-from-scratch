@@ -263,10 +263,10 @@ class MultiHeadSelfAttention(torch.nn.Module):
                 dtype=dtype,
             )
         # weights
-        self.weights_q = Linear(d_model, d_model)
-        self.weights_k = Linear(d_model, d_model)
-        self.weights_v = Linear(d_model, d_model)
-        self.weights_o = Linear(d_model, d_model)
+        self.weights_q = Linear(d_model, d_model, device=device, dtype=dtype)
+        self.weights_k = Linear(d_model, d_model, device=device, dtype=dtype)
+        self.weights_v = Linear(d_model, d_model, device=device, dtype=dtype)
+        self.weights_o = Linear(d_model, d_model, device=device, dtype=dtype)
 
     def forward(
         self, x: torch.Tensor, token_positions: torch.Tensor | None = None
