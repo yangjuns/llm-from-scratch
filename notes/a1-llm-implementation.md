@@ -358,3 +358,38 @@ updates, and upcasting in the forward pass doesn't recover bits already lost
 in storage. Common practice (LLaMA-style, mixed precision) is to keep norm
 weights in float32. Caveat: `model.to(torch.bfloat16)` casts them too, so
 keeping them float32 needs autocast or a manual exception.
+
+## Parameter and memory accounting (transformer_accounting a)
+
+Config (GPT-2 XL, from the assignment): vocab 50,257, 48 layers,
+d_model 1,600, 25 heads, d_ff 4,288 (nearest multiple of 64 to 8/3 x 1,600).
+
+**Attention parameters.** Each head's $W_q$ maps `d_model -> d_k` with
+`d_k = d_model / num_heads`, so it has `d_model x d_k` parameters (not
+`d_k x d_k`). Across all heads each of $W_q, W_k, W_v, W_o$ has `d_model^2`
+parameters, so attention totals `4 * d_model^2`, independent of head count.
+
+**Per block**
+- Attention: 4 x 1600^2 = 10,240,000
+- SwiGLU ($W_1, W_2, W_3$): 3 x 1600 x 4288 = 20,582,400
+- Two RMSNorms: 2 x 1600 = 3,200
+- Block total: 30,825,600
+
+**Whole model**
+- Embedding: 50,257 x 1600 = 80,411,200
+- 48 blocks: 1,479,628,800
+- Final norm: 1,600
+- LM head: 1600 x 50,257 = 80,411,200
+- **Total: 1,640,452,800 (about 1.64B)**
+
+(Weight tying would subtract one 80,411,200 table; the assignment model does
+not tie.)
+
+**Memory to load the weights**
+- Single precision (float32) is **4 bytes** per parameter:
+  1,640,452,800 x 4 = 6,561,811,200 bytes, about 6.56 GB or 6.11 GiB.
+- Half precision (fp16/bf16) is 2 bytes: about 3.28 GB or 3.06 GiB.
+
+Easy to mix up: "single precision" is 32-bit (4 bytes), not 2 bytes. Two bytes
+is half precision. Training needs far more than the weights alone (gradients,
+AdamW moments, activations).
