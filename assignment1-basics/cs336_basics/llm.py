@@ -150,15 +150,24 @@ class RoPE(torch.nn.Module):
         self.device = device
         self.d_model = d_k * 2  # Typically, d_model is twice d_k for RoPE
         # construct the rotary positional embedding matrix
-        seq = torch.arange(max_seq_len, device=device, dtype=dtype)
+        # Compute in float32: low-precision dtypes (e.g. bfloat16) cannot
+        # represent distinct integer positions beyond a few hundred.
+        seq = torch.arange(max_seq_len, device=device, dtype=torch.float32)
         freq = 1.0 / (
-            theta ** (torch.arange(0, d_k, 2, device=device, dtype=dtype) / d_k)
+            theta
+            ** (
+                torch.arange(0, d_k, 2, device=device, dtype=torch.float32)
+                / d_k
+            )
         )
         # This is the outer product. Storing the angles for each position and
         # frequency.
         angles = einsum(seq, freq, "seq, freq -> seq freq")
-        self.register_buffer("cos_cached", torch.cos(angles), persistent=False)
-        self.register_buffer("sin_cached", torch.sin(angles), persistent=False)
+        cos, sin = torch.cos(angles), torch.sin(angles)
+        if dtype is not None:
+            cos, sin = cos.to(dtype), sin.to(dtype)
+        self.register_buffer("cos_cached", cos, persistent=False)
+        self.register_buffer("sin_cached", sin, persistent=False)
 
     def forward(
         self, x: torch.Tensor, token_positions: torch.Tensor
@@ -202,10 +211,11 @@ def softmax(x: torch.Tensor, dim: int) -> torch.Tensor:
         Apply softmax along the given dimension. This doesn't change the shape of
     the tensor.
     """
+    in_type = x.dtype
+    x = x.to(torch.float32)
     x_reduced = x - x.max(dim=dim, keepdim=True).values
-    return torch.exp(x_reduced) / torch.sum(
-        torch.exp(x_reduced), dim=dim, keepdim=True
-    )
+    exp = torch.exp(x_reduced)
+    return (exp / torch.sum(exp, dim=dim, keepdim=True)).to(in_type)
 
 
 def scaled_dot_product_attention(

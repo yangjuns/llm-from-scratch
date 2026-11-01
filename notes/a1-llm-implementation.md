@@ -315,3 +315,46 @@ Why not store positions on the module at construction: they describe the
 input, not the model. A stored tensor fixes the sequence length and batch
 shape, breaks on truncated or longer inputs, and can't express any case above.
 Pass them in `forward` (or default them there).
+
+## Numerical precision: what needs float32
+
+Rule of thumb: matmuls and elementwise activations can run in the model
+`dtype` (bf16/fp16); anything that builds index-like values, sums many terms,
+or exponentiates should be computed in float32.
+
+**RoPE tables.** Positions, frequencies, angles, cos and sin are computed in
+float32, and only the finished tables are cast to `dtype`. bf16 has about 8
+bits of mantissa, so it cannot distinguish integer positions 256 and 257
+(fp16 has the same problem at larger positions). Both tokens would get the
+same rotation. Rotations only need relative accuracy, so casting the finished
+cos/sin down is fine.
+
+**Needs float32:**
+- RoPE position/angle computation (above).
+- RMSNorm mean of squares: a sum over `d_model` loses precision in bf16, and
+  `x^2` can overflow in fp16. Upcast, then cast the output back.
+- Softmax: `exp` and the sum over a long sequence lose accuracy. Upcast, then
+  cast back. Subtracting the max already prevents overflow.
+- Cross-entropy / log-sum-exp.
+- AdamW moments and master weights: small updates vanish in bf16 (about 3
+  significant digits).
+
+**Fine in `dtype`:** linear/embedding weights (hardware accumulates matmuls in
+float32 anyway), activations (SiLU, SwiGLU products), and the cos/sin tables
+after they are computed.
+
+### Type promotion
+
+When two tensors of different dtypes are combined, PyTorch takes the wider
+type. In RMSNorm, `x_normed` is float32 and `self.weights` may be bf16, so
+`x_normed * self.weights` is computed in float32. The weights are stored in
+bf16 but used in float32.
+
+### Should norm weights be stored in `dtype`?
+
+Mostly no. They are only `d_model` values per norm, so float32 storage costs
+nothing in memory. A learned parameter stored in bf16 can't represent small
+updates, and upcasting in the forward pass doesn't recover bits already lost
+in storage. Common practice (LLaMA-style, mixed precision) is to keep norm
+weights in float32. Caveat: `model.to(torch.bfloat16)` casts them too, so
+keeping them float32 needs autocast or a manual exception.
