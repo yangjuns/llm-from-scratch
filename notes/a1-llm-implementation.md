@@ -419,3 +419,88 @@ Trade-offs: gradients from both uses flow into one matrix, the initialization
 must suit both roles, and the input and output sides can't be tuned
 independently. The assignment model does **not** tie, so both tables are
 counted in the parameter total.
+
+## Forward-pass FLOPs (transformer_accounting b, c)
+
+Rule: a matmul `(m, k) @ (k, n)` costs `2 * m * k * n` FLOPs (one multiply
+and one add per term). Only matmuls are counted.
+
+Config: seq 1,024, d_model 1,600, 25 heads (d_k = 64), d_ff 4,288, 48 layers,
+vocab 50,257.
+
+**Per block**
+| Matmul | Formula | FLOPs |
+|---|---|---|
+| Q, K, V projections | 3 x 2 seq d^2 | 15,728,640,000 |
+| QK^T and scores @ V | 4 seq^2 d | 6,710,886,400 |
+| W_o projection | 2 seq d^2 | 5,242,880,000 |
+| SwiGLU (W1, W2, W3) | 3 x 2 seq d d_ff | 42,152,755,200 |
+| **Block total** | | **69,835,161,600** |
+
+**Whole model**
+- 48 blocks: 3,352,087,756,800
+- LM head: 2 x seq x d x vocab = 164,682,137,600
+- **Total: 3,516,769,894,400 FLOPs (about 3.52 TFLOPs)**
+
+**Common mistakes**
+- SwiGLU has **three** matmuls (W1, W3: `d -> d_ff`; W2: `d_ff -> d`), not two.
+- Attention scores are per head `seq x seq`. `QK^T` is
+  `(seq, d_k) @ (d_k, seq)` = `2 seq^2 d_k`, and `scores @ V` is
+  `(seq, seq) @ (seq, d_k)` = `2 seq^2 d_k`. Over `h` heads that sums to
+  `4 seq^2 d`.
+- Per-head Q/K/V cost `2 seq d d_k` each; times `h` heads gives `2 seq d^2`,
+  so head count does not change the projection FLOPs.
+
+**Which parts dominate (c)**
+| Component | FLOPs | Share |
+|---|---|---|
+| SwiGLU FFN | 2,023,332,249,600 | 57.5% |
+| Q/K/V/O projections | 1,006,632,960,000 | 28.6% |
+| Attention scores (QK^T, @V) | 322,122,547,200 | 9.2% |
+| LM head | 164,682,137,600 | 4.7% |
+
+The FFN dominates, followed by the attention projections. The `seq^2` score
+matmuls are small at seq 1,024, but they grow quadratically with context
+length while everything else grows linearly.
+
+## FLOPs across model sizes and context length (transformer_accounting d, e)
+
+`d_ff` is the nearest multiple of 64 to 8/3 x d_model; seq 1,024, vocab
+50,257.
+
+| Model | Layers | d_model | Heads | d_ff | Total FLOPs |
+|---|---|---|---|---|---|
+| Small | 12 | 768 | 12 | 2,048 | 291,648,307,200 (0.29T) |
+| Medium | 24 | 1,024 | 16 | 2,752 | 830,172,299,264 (0.83T) |
+| Large | 36 | 1,280 | 20 | 3,392 | 1,768,530,903,040 (1.77T) |
+| XL | 48 | 1,600 | 25 | 4,288 | 3,516,769,894,400 (3.52T) |
+
+**Share of total FLOPs (d)**
+| Model | FFN (SwiGLU) | Q/K/V/O projections | Attention scores | LM head |
+|---|---|---|---|---|
+| Small | 39.8% | 19.9% | 13.3% | 27.1% |
+| Medium | 50.1% | 24.8% | 12.4% | 12.7% |
+| Large | 54.3% | 27.3% | 10.9% | 7.5% |
+| XL | 57.5% | 28.6% | 9.2% | 4.7% |
+
+Takeaway: as the model grows, the FFN and projection shares rise because
+their cost scales with `d_model^2` and with layer count. The LM head share
+falls sharply because it scales only with `d_model`. The attention-score
+share falls slowly because `seq^2 * d_model` grows more slowly than
+`d_model^2` when seq is fixed.
+
+**GPT-2 XL at context length 16,384 (e)**
+
+Total rises from 3.52T to about 133.6T FLOPs, roughly 38x for a 16x longer
+context. Everything except the attention scores is linear in seq (16x); the
+scores are quadratic (256x), so they take over:
+
+| Component | Share at 1,024 | Share at 16,384 |
+|---|---|---|
+| Attention scores | 9.2% | 61.7% |
+| SwiGLU FFN | 57.5% | 24.2% |
+| Q/K/V/O projections | 28.6% | 12.1% |
+| LM head | 4.7% | 2.0% |
+
+Long contexts make attention the bottleneck, which is why FlashAttention and
+sparse or linear attention variants matter.
