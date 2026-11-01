@@ -122,7 +122,7 @@ independently verified by the log.
 The pitfall: I first tried training on my local WSL:Ubuntu VM, which has 24 GB
 RAM, and the attempt failed. I then moved the run to a rented GCP VM. .
 
-## Part 3 - Encoding
+## Part 4 - Encoding
 
 ### Sampled compression ratio
 
