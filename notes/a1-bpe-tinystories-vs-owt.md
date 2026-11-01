@@ -120,7 +120,7 @@ I rented a GCP E2 high-memory VM with 16 vCPUs and
 independently verified by the log.
 
 The pitfall: I first tried training on my local WSL:Ubuntu VM, which has 24 GB
-RAM, and the attempt failed. I then moved the run to a rented GCP VM. .
+RAM, and the attempt failed. I then moved the run to a rented GCP VM.
 
 ## Part 4 - Encoding
 
