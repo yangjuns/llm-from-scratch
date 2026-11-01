@@ -393,3 +393,29 @@ not tie.)
 Easy to mix up: "single precision" is 32-bit (4 bytes), not 2 bytes. Two bytes
 is half precision. Training needs far more than the weights alone (gradients,
 AdamW moments, activations).
+
+### Weight tying
+
+Weight tying uses **one matrix for both the input embedding and the output
+(LM head) projection**.
+
+- Embedding: token id -> vector, a lookup into a `(vocab_size, d_model)` table
+  `E`.
+- LM head: final hidden vector -> logits over the vocabulary, a
+  `(d_model, vocab_size)` matrix.
+
+The two have the same shape up to a transpose, so with tying the logits are
+`h @ E.T`. In PyTorch: `lm_head.weight = embedding.weight`.
+
+Why do it:
+- Saves `vocab_size x d_model` parameters (80,411,200 for GPT-2 XL, about 5%
+  of the model; a larger share for small models with big vocabularies).
+- Mild regularization: the same vector must work for both reading a token in
+  and predicting it out (Press & Wolf, 2017).
+- GPT-2 and many small LMs tie weights; many large modern models (e.g. LLaMA)
+  do not.
+
+Trade-offs: gradients from both uses flow into one matrix, the initialization
+must suit both roles, and the input and output sides can't be tuned
+independently. The assignment model does **not** tie, so both tables are
+counted in the parameter total.
