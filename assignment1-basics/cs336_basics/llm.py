@@ -132,6 +132,9 @@ class SwiGLUFF(torch.nn.Module):
 
 
 class RoPE(torch.nn.Module):
+    cos_cached: torch.Tensor
+    sin_cached: torch.Tensor
+
     def __init__(
         self,
         theta: float,
@@ -273,6 +276,7 @@ class MultiHeadSelfAttention(torch.nn.Module):
     ) -> torch.Tensor:
         """
         x: (..., seq, d_model)
+        token_positions: (..., seq)
         """
         Q = self.weights_q(x)
         q_heads = rearrange(
@@ -288,7 +292,9 @@ class MultiHeadSelfAttention(torch.nn.Module):
         )
 
         # Applying RoPE to Q and K
-        if self.enable_rope and token_positions is not None:
+        if self.enable_rope:
+            if token_positions is None:
+                token_positions = torch.arange(x.shape[-2], device=x.device)
             # Need to add a head dimension to the token_positions
             token_positions = token_positions.unsqueeze(-2)
             q_heads = self.rope(q_heads, token_positions)
