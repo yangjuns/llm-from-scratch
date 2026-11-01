@@ -40,7 +40,7 @@ class Linear(torch.nn.Module):
         return einsum(
             x,
             self.weights,
-            "batch_size sequence_length d_model, d_ff d_model -> batch_size sequence_length d_ff",
+            "... d_model, d_ff d_model -> ... d_ff",
         )
 
 
