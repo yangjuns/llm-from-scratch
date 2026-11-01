@@ -154,8 +154,8 @@ class RoPE(torch.nn.Module):
         # This is the outer product. Storing the angles for each position and
         # frequency.
         angles = einsum(seq, freq, "seq, freq -> seq freq")
-        self.cos_cached = torch.cos(angles)
-        self.sin_cached = torch.sin(angles)
+        self.register_buffer("cos_cached", torch.cos(angles), persistent=False)
+        self.register_buffer("sin_cached", torch.sin(angles), persistent=False)
 
     def forward(
         self, x: torch.Tensor, token_positions: torch.Tensor
