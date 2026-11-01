@@ -102,7 +102,7 @@ The successful OpenWebText BPE training run used `owt_train.txt`, a 32K
 vocabulary, and eight worker processes. The recorded command was:
 
 ```text
-uv run python -u -m cs336_basics.train_bpe data/owt_train.txt --vocab-size 32000 --num-processes 8 --output-dir artifacts/owe_train_bpe
+uv run python -u -m cs336_basics.train_bpe data/owt_train.txt --vocab-size 32000 --num-processes 8 --output-dir artifacts/owt_train_bpe
 ```
 
 | Metric | Recorded result |
