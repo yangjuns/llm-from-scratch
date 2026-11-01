@@ -216,7 +216,7 @@ def scaled_dot_product_attention(
     key: (batch_size, ..., seq_len, dk)
     value: (batch, ..., seq_len, dv)
     mask: (seq_len, seq_len) - A matrix of True and False. Row i of the matrix
-    indiciates which key the query i should attend to. [i,j] = True means query
+    indicates which key the query i should attend to. [i,j] = True means query
     i should attend to key j.
     """
     dk: int = query.shape[-1]
