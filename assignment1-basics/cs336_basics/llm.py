@@ -289,7 +289,7 @@ class MultiHeadSelfAttention(torch.nn.Module):
 
         # Applying RoPE to Q and K
         if self.enable_rope and token_positions is not None:
-            # Need to add a head dimention to the token_positions
+            # Need to add a head dimension to the token_positions
             token_positions = token_positions.unsqueeze(-2)
             q_heads = self.rope(q_heads, token_positions)
             k_heads = self.rope(k_heads, token_positions)
