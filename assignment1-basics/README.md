@@ -48,3 +48,16 @@ gunzip owt_valid.txt.gz
 cd ..
 ```
 
+### Pre-tokenize data
+After training the TinyStories and OpenWebText BPE tokenizers and downloading
+the datasets, encode each split into a one-dimensional `uint16` NumPy array.
+Chunks are split at `<|endoftext|>` boundaries and processed in parallel:
+
+```sh
+uv run python -m cs336_basics.tokenize_dataset --workers 6
+```
+
+The arrays are saved under `data/tokenized/` as `tinystories_train.npy`,
+`tinystories_valid.npy`, `owt_train.npy`, and `owt_valid.npy`. They can be
+loaded without reading the full arrays into memory using
+`np.load(path, mmap_mode="r")`.
