@@ -16,7 +16,7 @@ def cross_entropy(logits: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
     # Cross Entropy L = logsumexp normalization - correct logits
     # Use gather to compute the correct logits
     indices = target.unsqueeze(-1)
-    correct_logits = stable_logits.gather(dim=-1, index=indices)
+    correct_logits = stable_logits.gather(dim=-1, index=indices).squeeze(-1)
 
     loss = (
         stable_logits.logsumexp(dim=-1) - correct_logits
