@@ -14,6 +14,7 @@ import cs336_basics.pretokenization as pt
 import cs336_basics.bpe as bpe
 from cs336_basics.tokenizer import Tokenizer
 from cs336_basics import llm
+from cs336_basics import llm_train
 
 
 def run_linear(
@@ -545,7 +546,7 @@ def run_cross_entropy(
     Returns:
         Float[Tensor, ""]: The average cross-entropy loss across examples.
     """
-    raise NotImplementedError
+    return llm_train.cross_entropy(inputs, targets)
 
 
 def run_gradient_clipping(
