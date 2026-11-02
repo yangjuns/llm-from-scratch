@@ -496,3 +496,19 @@ torch.zeros(p.shape)  # zeros, (2, 3), but cpu, float32
 - Use it for optimizer state (AdamW `m`, `v`) so the state matches the
   parameter: `m = state.get("m", torch.zeros_like(p))`.
 - Siblings: `ones_like`, `empty_like`, `full_like`, `rand_like`, `randn_like`.
+
+## GPU compute capability and PyTorch compatibility
+
+- NVIDIA compute capability (CC) identifies a GPU's hardware features and
+  instruction set. It is fixed for a GPU model; a GTX 1050 Ti has CC 6.1.
+- A PyTorch CUDA build must include kernels compatible with the GPU's CC.
+  If it does not, CUDA operations on that GPU may fail; PyTorch does not
+  generally move those operations to the CPU automatically.
+- A newer CUDA toolkit or driver cannot change a GPU's CC. To use an older
+  GPU, install a PyTorch build that supports its CC, or run on the CPU.
+- A CUDA compatibility warning can appear even when a test's real work uses
+  the CPU: requesting a CUDA device can initialize CUDA and report the
+  installed GPU. In `tests/test_data.py`, the batches use `"cpu"`; the test's
+  final `"cuda:99"` request is deliberately invalid and checks device-error
+  handling. The warning about GPU 0 does not mean the test ran batches on
+  `cuda:0`.

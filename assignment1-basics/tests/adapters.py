@@ -15,6 +15,7 @@ import cs336_basics.bpe as bpe
 from cs336_basics.tokenizer import Tokenizer
 from cs336_basics import llm
 from cs336_basics import llm_train
+from cs336_basics.load_data import load_data
 
 
 def run_linear(
@@ -509,7 +510,7 @@ def run_get_batch(
         is the sampled input sequences, and the second tuple item is the corresponding
         language modeling labels.
     """
-    raise NotImplementedError
+    return load_data(dataset, batch_size, context_length, device)
 
 
 def run_softmax(
