@@ -631,3 +631,174 @@ Rule: for a quadratic loss, SGD converges only if $|1 - lr_t \cdot curvature| < 
 Too small is slow, too large diverges, and the best value sits in between.
 The `1/sqrt(t+1)` decay eventually shrinks any step size, but not before
 a too-large lr has already blown the loss up (as with lr = 1e3).
+
+## AdamW peak memory (adamw_accounting a)
+
+Let `B = batch_size`, `T = context_length`, `L = num_layers`,
+`d = d_model`, `h = num_heads`, and `V = vocab_size`. Use
+`d_ff = 8d/3`, as specified in the problem. The expressions below count
+float32 values; multiply by 4 to get bytes.
+
+The parameter count, keeping `d_ff` explicit, is
+
+$$
+P = 2Vd + L(4d^2 + 3d\,d_{ff} + 2d) + d
+$$
+
+The terms are the input embedding and LM head (`2Vd`), each block's attention
+(`4d^2`), SwiGLU weights (`3d d_ff`), and two RMSNorms (`2d`), and the final
+RMSNorm (`d`). Substituting the problem's `d_ff = 8d/3` gives
+`P = 2Vd + L(12d^2 + 2d) + d`. The earlier GPT-2 XL count
+`P = 1,640,452,800` uses the rounded width `d_ff = 4,288`; the exact `8d/3`
+assumption gives a slightly different parameter count.
+
+| Memory component | Float32 values |
+| --- | ---: |
+| Parameters | $P$ |
+| Gradients | $P$ |
+| AdamW optimizer state (`m` and `v`) | $2P$ |
+
+For activations, count the outputs of the components listed in the problem.
+Within one block:
+
+| Component | Float32 values |
+| --- | ---: |
+| Two RMSNorms | $2BTd$ |
+| Q, K, V projections | $3BTd$ |
+| $QK^\top$ scores and softmax | $2BhT^2$ |
+| Weighted sum of values | $BTd$ |
+| Attention output projection | $BTd$ |
+| SwiGLU: $W_1$, $W_2$, SiLU, elementwise product | $4BTd_{ff}$ |
+| SwiGLU output projection $W_3$ | $BTd$ |
+| **Per-block total** | $\frac{56}{3}BTd + 2BhT^2$ |
+
+Across the model, include the final RMSNorm (`BTd`), the output projection
+logits (`BTV`), and one logits-sized cross-entropy working tensor (`BTV`,
+e.g. the shifted logits in the simple implementation). Thus
+
+$$
+A = L\left(\frac{56}{3}BTd + 2BhT^2\right) + BTd + 2BTV
+$$
+
+The simple total is
+
+$$
+\text{total float32 values} = P + A + P + 2P = 4P + A,
+\qquad
+\text{total bytes} = 16P + 4A.
+$$
+
+The activations depend on batch size; parameters, gradients, and optimizer
+state do not. This is the assignment's component-counting estimate, not an
+exact runtime peak: actual peak depends on which intermediates are retained or
+freed during forward and backward.
+
+### GPT-2 XL-shaped model (adamw_accounting b)
+
+Use `V = 50,257`, `T = 1,024`, `L = 48`, `d = 1,600`, `h = 25`, and
+`d_ff = 4,288`. Substituting these into the part (a) formulas gives
+`P = 1,640,452,800` parameters and `A = 4,089,153,536 × batch_size`
+activation float32 values. Therefore
+
+$$
+\text{memory}(\mathtt{batch\_size})
+= 4(4P + A)
+= 26,247,244,800 \text{ bytes}
+ + (16,356,614,144 \text{ bytes}) \times \text{batch\_size}
+$$
+
+In decimal gigabytes, this is approximately
+`26.2472 GB + 16.3566 GB × batch_size`. At batch size 3, the estimate is about
+75.32 GB; at batch size 4, it is about 91.67 GB. Thus the maximum batch size
+under an 80 GB limit is **3**.
+
+### How large models are trained in practice
+
+The batch size of 3 above is the assignment's naive setup: fp32, every
+activation stored, one GPU. It is a per-GPU micro-batch, not what people train
+with. Large LM training uses a *global* batch of roughly 0.5M to 4M tokens per
+step (GPT-3's largest model used about 3.2M). The handout's 1024 sequences of
+1024 tokens is about 1M tokens. A batch of 3 sequences (about 3K tokens) gives
+noisy gradients and poor GPU utilization.
+
+Techniques used to get there:
+
+1. **Gradient accumulation.** Run several micro-batches, summing gradients, then
+   call `optimizer.step()` once. Memory stays at the micro-batch level; the
+   effective batch is `micro_batch * accum_steps`. Reaching 1024 from a
+   micro-batch of 3 would take about 340 accumulation steps. Divide each
+   micro-batch loss by `accum_steps` so the summed gradient is the mean.
+2. **Data parallelism.** Each GPU processes its own micro-batch and gradients are
+   averaged across GPUs (e.g. 128 GPUs x 8 sequences = 1024).
+3. **Sharding (ZeRO / FSDP).** Split the `16P` bytes of parameters, gradients and
+   Adam state across GPUs instead of replicating them, freeing memory for
+   activations.
+4. **Mixed precision (bf16/fp16).** Forward and backward use 2-byte activations,
+   roughly halving activation memory and speeding up compute. Master weights and
+   Adam moments are usually kept in fp32.
+5. **Activation checkpointing.** Store only some activations and recompute the
+   rest during backward, trading about 30% extra compute for much less memory.
+6. **FlashAttention.** Avoids materializing the `B * h * T^2` attention scores
+   and softmax, which are the `2BhT^2` per-layer term in the formula above.
+
+For GPT-2 XL, activations (about 16 GB per sequence) dominate the fixed 26 GB,
+so activation techniques (3-6) help the most per sequence. For this
+assignment's own runs, gradient accumulation is the simplest to add to the
+training loop.
+
+Cross-check: public CS336 write-ups
+([m2214x](https://github.com/m2214x/cs336-assignment1/blob/main/solution.md),
+[k-ye](https://github.com/k-ye/OpenCourses/blob/master/Stanford/CS336/assignment1-basics/writeups.md))
+also report a maximum batch size of 3 under the 80 GB limit.
+
+### AdamW FLOPs per step (adamw_accounting c)
+
+Count elementwise operations per parameter. Scalars that are the same for
+every parameter (`1 - beta1`, `1 - beta2`, `alpha_t`, `alpha * lambda`) are
+computed once and are negligible.
+
+| Update | Operations | FLOPs |
+| --- | --- | ---: |
+| $m \leftarrow \beta_1 m + (1-\beta_1) g$ | $\beta_1 m$, $(1-\beta_1)g$, add | 3 |
+| $v \leftarrow \beta_2 v + (1-\beta_2) g^2$ | $g^2$, $\beta_2 v$, $(1-\beta_2)g^2$, add | 4 |
+| $\theta \leftarrow \theta - \alpha_t \frac{m}{\sqrt{v}+\epsilon}$ | $\sqrt{v}$, $+\epsilon$, divide, $\times\alpha_t$, subtract | 5 |
+| $\theta \leftarrow \theta - \alpha\lambda\theta$ | $\alpha\lambda\theta$, subtract | 2 |
+| **Total per parameter** | | **14** |
+
+So one AdamW step costs about $14P$ FLOPs. For GPT-2 XL,
+$P = 1,640,452,800$, giving $14P \approx 2.30 \times 10^{10}$ FLOPs.
+
+The exact constant depends on counting conventions (for example whether the
+square root and division count as one FLOP each, or how scalar terms are
+folded); public write-ups report 13 or 14. The point is that the cost is a small
+constant times $P$. It is negligible next to the forward and backward pass,
+which cost on the order of $10^{15}$ FLOPs per step at batch size 1024.
+
+
+### Training time on one H100 (adamw_accounting d)
+
+"Backward = 2x forward" applies to the model's forward pass only. The optimizer
+is a separate cost added on top:
+
+$$
+\text{FLOPs per step} = F + 2F + 14P = 3F + 14P
+$$
+
+GPT-2 XL, batch 1,024, context 1,024:
+- Forward per sequence: 3,516,769,894,400 FLOPs, so $F = 1024 \times$ that
+  $= 3.601 \times 10^{15}$.
+- $3F = 1.0804 \times 10^{16}$; $14P = 2.30 \times 10^{10}$, about
+  0.0002% of the step, so it is negligible.
+- Per step: $\approx 1.0804 \times 10^{16}$ FLOPs.
+
+Throughput: H100 peak 495 TFLOP/s at 50% MFU gives $247.5 \times 10^{12}$
+FLOP/s.
+
+$$
+\text{time} = \frac{400{,}000 \times 1.0804 \times 10^{16}}{2.475 \times 10^{14}}
+\approx 1.746 \times 10^{7}\ \text{s} \approx 4{,}850\ \text{hours}
+\approx 202\ \text{days}
+$$
+
+So training GPT-2 XL this way on a single GPU takes about 6.6 months, which is
+why large models are trained on many GPUs in parallel.
