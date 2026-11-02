@@ -97,6 +97,8 @@ def cosine_annealing_lr_schedule(
 def gradiant_clip(parameters: Iterable[torch.nn.Parameter], max_l2_norm: float):
     eps = 1e-6
     grads = [p.grad.flatten() for p in parameters if p.grad is not None]
+    if not grads:
+        return
     all_grads = torch.cat(grads)
     # Compute the l2 norm for all paramaters
     total_norm: float = float(all_grads.norm())  # type: ignore
