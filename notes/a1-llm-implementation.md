@@ -596,3 +596,38 @@ Consequences:
   differ per class (e.g. adding a bias vector) do change the loss.
 - Different examples may use different constants, which is why the max is
   taken per example (over the vocab axis), not over the whole batch.
+
+## SGD learning-rate tuning (learning_rate_tuning)
+
+Toy problem from the assignment: `weights = 5 * randn(10, 10)`, loss
+`mean(weights**2)`, SGD with step size `lr / sqrt(t + 1)`, 10 iterations
+(seed 0, starting loss 26.27).
+
+| lr | Loss at steps 0 -> 9 | Behavior |
+|---|---|---|
+| 1 | 26.3 -> 21.7 | Decays, but slowly |
+| 1e1 | 26.3 -> 3.5 | Decays faster |
+| 1e2 | 26.3 -> 2e-23 | Collapses to about zero within about 5 steps |
+| 1e3 | 26.3 -> 2.4e18 | Diverges, grows by orders of magnitude each step |
+
+**Why.** The gradient of `mean(w^2)` over 100 entries is `2w / 100`, so one
+step is
+
+$$
+w \leftarrow w\left(1 - \frac{lr_t}{50}\right), \qquad lr_t = \frac{lr}{\sqrt{t+1}}
+$$
+
+Every weight is multiplied by the same factor, so the loss is multiplied by
+$(1 - lr_t/50)^2$ each step.
+- Small lr: factor close to 1, slow decay.
+- lr = 100: at step 0, $lr_t = 100$, so the factor is $1 - 100/50 = -1$.
+  The weights flip sign and the loss at step 1 equals step 0. At step 2,
+  $lr_t = 100/\sqrt{2} \approx 70.7$ gives factor about $-0.41$, so the loss
+  drops by $0.41^2 \approx 0.17$ (26.3 -> 4.5), then keeps collapsing.
+- lr = 1000: $|factor| \gg 1$, so the weights overshoot and grow every step:
+  divergence.
+
+Rule: for a quadratic loss, SGD converges only if $|1 - lr_t \cdot curvature| < 1$.
+Too small is slow, too large diverges, and the best value sits in between.
+The `1/sqrt(t+1)` decay eventually shrinks any step size, but not before
+a too-large lr has already blown the loss up (as with lr = 1e3).
