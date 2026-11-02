@@ -14,6 +14,7 @@ import cs336_basics.pretokenization as pt
 import cs336_basics.bpe as bpe
 from cs336_basics.tokenizer import Tokenizer
 from cs336_basics import llm
+from cs336_basics import llm_train
 
 
 def run_linear(
@@ -545,7 +546,7 @@ def run_cross_entropy(
     Returns:
         Float[Tensor, ""]: The average cross-entropy loss across examples.
     """
-    raise NotImplementedError
+    return llm_train.cross_entropy(inputs, targets)
 
 
 def run_gradient_clipping(
@@ -559,14 +560,14 @@ def run_gradient_clipping(
 
     The gradients of the parameters (parameter.grad) should be modified in-place.
     """
-    raise NotImplementedError
+    return llm_train.gradiant_clip(parameters, max_l2_norm)
 
 
 def get_adamw_cls() -> Any:
     """
     Returns a torch.optim.Optimizer that implements AdamW.
     """
-    raise NotImplementedError
+    return llm_train.AdamW
 
 
 def run_get_lr_cosine_schedule(
@@ -594,7 +595,13 @@ def run_get_lr_cosine_schedule(
     Returns:
         Learning rate at the given iteration under the specified schedule.
     """
-    raise NotImplementedError
+    return llm_train.cosine_annealing_lr_schedule(
+        it,
+        max_learning_rate,
+        min_learning_rate,
+        warmup_iters,
+        cosine_cycle_iters,
+    )
 
 
 def run_save_checkpoint(

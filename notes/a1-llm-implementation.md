@@ -358,3 +358,447 @@ updates, and upcasting in the forward pass doesn't recover bits already lost
 in storage. Common practice (LLaMA-style, mixed precision) is to keep norm
 weights in float32. Caveat: `model.to(torch.bfloat16)` casts them too, so
 keeping them float32 needs autocast or a manual exception.
+
+## Parameter and memory accounting (transformer_accounting a)
+
+Config (GPT-2 XL, from the assignment): vocab 50,257, 48 layers,
+d_model 1,600, 25 heads, d_ff 4,288 (nearest multiple of 64 to 8/3 x 1,600).
+
+**Attention parameters.** Each head's $W_q$ maps `d_model -> d_k` with
+`d_k = d_model / num_heads`, so it has `d_model x d_k` parameters (not
+`d_k x d_k`). Across all heads each of $W_q, W_k, W_v, W_o$ has `d_model^2`
+parameters, so attention totals `4 * d_model^2`, independent of head count.
+
+**Per block**
+- Attention: 4 x 1600^2 = 10,240,000
+- SwiGLU ($W_1, W_2, W_3$): 3 x 1600 x 4288 = 20,582,400
+- Two RMSNorms: 2 x 1600 = 3,200
+- Block total: 30,825,600
+
+**Whole model**
+- Embedding: 50,257 x 1600 = 80,411,200
+- 48 blocks: 1,479,628,800
+- Final norm: 1,600
+- LM head: 1600 x 50,257 = 80,411,200
+- **Total: 1,640,452,800 (about 1.64B)**
+
+(Weight tying would subtract one 80,411,200 table; the assignment model does
+not tie.)
+
+**Memory to load the weights**
+- Single precision (float32) is **4 bytes** per parameter:
+  1,640,452,800 x 4 = 6,561,811,200 bytes, about 6.56 GB or 6.11 GiB.
+- Half precision (fp16/bf16) is 2 bytes: about 3.28 GB or 3.06 GiB.
+
+Easy to mix up: "single precision" is 32-bit (4 bytes), not 2 bytes. Two bytes
+is half precision. Training needs far more than the weights alone (gradients,
+AdamW moments, activations).
+
+### Weight tying
+
+Weight tying uses **one matrix for both the input embedding and the output
+(LM head) projection**.
+
+- Embedding: token id -> vector, a lookup into a `(vocab_size, d_model)` table
+  `E`.
+- LM head: final hidden vector -> logits over the vocabulary, a
+  `(d_model, vocab_size)` matrix.
+
+The two have the same shape up to a transpose, so with tying the logits are
+`h @ E.T`. In PyTorch: `lm_head.weight = embedding.weight`.
+
+Why do it:
+- Saves `vocab_size x d_model` parameters (80,411,200 for GPT-2 XL, about 5%
+  of the model; a larger share for small models with big vocabularies).
+- Mild regularization: the same vector must work for both reading a token in
+  and predicting it out (Press & Wolf, 2017).
+- GPT-2 and many small LMs tie weights; many large modern models (e.g. LLaMA)
+  do not.
+
+Trade-offs: gradients from both uses flow into one matrix, the initialization
+must suit both roles, and the input and output sides can't be tuned
+independently. The assignment model does **not** tie, so both tables are
+counted in the parameter total.
+
+## Forward-pass FLOPs (transformer_accounting b, c)
+
+Rule: a matmul `(m, k) @ (k, n)` costs `2 * m * k * n` FLOPs (one multiply
+and one add per term). Only matmuls are counted.
+
+Config: seq 1,024, d_model 1,600, 25 heads (d_k = 64), d_ff 4,288, 48 layers,
+vocab 50,257.
+
+**Per block**
+| Matmul | Formula | FLOPs |
+|---|---|---|
+| Q, K, V projections | 3 x 2 seq d^2 | 15,728,640,000 |
+| QK^T and scores @ V | 4 seq^2 d | 6,710,886,400 |
+| W_o projection | 2 seq d^2 | 5,242,880,000 |
+| SwiGLU (W1, W2, W3) | 3 x 2 seq d d_ff | 42,152,755,200 |
+| **Block total** | | **69,835,161,600** |
+
+**Whole model**
+- 48 blocks: 3,352,087,756,800
+- LM head: 2 x seq x d x vocab = 164,682,137,600
+- **Total: 3,516,769,894,400 FLOPs (about 3.52 TFLOPs)**
+
+**Common mistakes**
+- SwiGLU has **three** matmuls (W1, W3: `d -> d_ff`; W2: `d_ff -> d`), not two.
+- Attention scores are per head `seq x seq`. `QK^T` is
+  `(seq, d_k) @ (d_k, seq)` = `2 seq^2 d_k`, and `scores @ V` is
+  `(seq, seq) @ (seq, d_k)` = `2 seq^2 d_k`. Over `h` heads that sums to
+  `4 seq^2 d`.
+- Per-head Q/K/V cost `2 seq d d_k` each; times `h` heads gives `2 seq d^2`,
+  so head count does not change the projection FLOPs.
+
+**Which parts dominate (c)**
+| Component | FLOPs | Share |
+|---|---|---|
+| SwiGLU FFN | 2,023,332,249,600 | 57.5% |
+| Q/K/V/O projections | 1,006,632,960,000 | 28.6% |
+| Attention scores (QK^T, @V) | 322,122,547,200 | 9.2% |
+| LM head | 164,682,137,600 | 4.7% |
+
+The FFN dominates, followed by the attention projections. The `seq^2` score
+matmuls are small at seq 1,024, but they grow quadratically with context
+length while everything else grows linearly.
+
+## FLOPs across model sizes and context length (transformer_accounting d, e)
+
+`d_ff` is the nearest multiple of 64 to 8/3 x d_model; seq 1,024, vocab
+50,257.
+
+| Model | Layers | d_model | Heads | d_ff | Total FLOPs |
+|---|---|---|---|---|---|
+| Small | 12 | 768 | 12 | 2,048 | 291,648,307,200 (0.29T) |
+| Medium | 24 | 1,024 | 16 | 2,752 | 830,172,299,264 (0.83T) |
+| Large | 36 | 1,280 | 20 | 3,392 | 1,768,530,903,040 (1.77T) |
+| XL | 48 | 1,600 | 25 | 4,288 | 3,516,769,894,400 (3.52T) |
+
+**Share of total FLOPs (d)**
+| Model | FFN (SwiGLU) | Q/K/V/O projections | Attention scores | LM head |
+|---|---|---|---|---|
+| Small | 39.8% | 19.9% | 13.3% | 27.1% |
+| Medium | 50.1% | 24.8% | 12.4% | 12.7% |
+| Large | 54.3% | 27.3% | 10.9% | 7.5% |
+| XL | 57.5% | 28.6% | 9.2% | 4.7% |
+
+Takeaway: as the model grows, the FFN and projection shares rise because
+their cost scales with `d_model^2` and with layer count. The LM head share
+falls sharply because it scales only with `d_model`. The attention-score
+share falls slowly because `seq^2 * d_model` grows more slowly than
+`d_model^2` when seq is fixed.
+
+**GPT-2 XL at context length 16,384 (e)**
+
+Total rises from 3.52T to about 133.6T FLOPs, roughly 38x for a 16x longer
+context. Everything except the attention scores is linear in seq (16x); the
+scores are quadratic (256x), so they take over:
+
+| Component | Share at 1,024 | Share at 16,384 |
+|---|---|---|
+| Attention scores | 9.2% | 61.7% |
+| SwiGLU FFN | 57.5% | 24.2% |
+| Q/K/V/O projections | 28.6% | 12.1% |
+| LM head | 4.7% | 2.0% |
+
+Long contexts make attention the bottleneck, which is why FlashAttention and
+sparse or linear attention variants matter.
+
+## Cross-entropy loss: derivation
+
+For one example with logits $o \in \mathbb{R}^V$ and target class $y$
+(an integer index, not a one-hot vector):
+
+$$
+\ell = -\log \operatorname{softmax}(o)_y
+     = -\log \frac{\exp(o_y)}{\sum_{j} \exp(o_j)}
+$$
+
+Split the log of the quotient:
+
+$$
+\ell = -\big[\log \exp(o_y) - \log \sum_j \exp(o_j)\big]
+     = -o_y + \log \sum_j \exp(o_j)
+$$
+
+The `log` and `exp` cancel on the target term. So:
+
+$$
+\boxed{\ell = \underbrace{\log \sum_j \exp(o_j)}_{\text{normalization (logsumexp)}}
+\;-\; \underbrace{o_y}_{\text{correct logit}}}
+$$
+
+Intuition: the loss is small when the correct logit is large compared to the
+logsumexp of all logits (a smooth maximum). It is zero only in the limit
+where $o_y$ dominates all other logits.
+
+**Numerical stability.** Subtract $m = \max_j o_j$ from every logit first:
+
+$$
+\log \sum_j \exp(o_j) = m + \log \sum_j \exp(o_j - m),
+\qquad o_y = m + (o_y - m)
+$$
+
+The $m$ cancels in $\ell$, so the loss is unchanged, but $\exp$ never sees a
+large positive number (no overflow).
+
+**Implementation notes**
+- Targets are class ids with shape `(batch, ...)`; logits are
+  `(batch, ..., vocab)`. No one-hot conversion is needed.
+- Pick the correct logit with `gather`:
+  `shifted.gather(-1, target.unsqueeze(-1)).squeeze(-1)`
+  (see `tensor-operations.md`).
+- The loss to report is the **mean** over all batch positions.
+- Compute in float32 if the logits are bf16/fp16 (see the precision section).
+- Never form the softmax probabilities and then take the log: that loses
+  precision when probabilities are tiny. Using logsumexp avoids it.
+
+### Why adding a constant to the logits doesn't change the loss
+
+Let $o'_j = o_j + c$ for every $j$ (the same constant $c$ for all classes).
+Start from $\ell = \log \sum_j \exp(o_j) - o_y$ and plug in $o'$:
+
+$$
+\ell' = \log \sum_j \exp(o_j + c) - (o_y + c)
+$$
+
+Factor $\exp(c)$ out of the sum, since $\exp(o_j + c) = \exp(o_j)\exp(c)$:
+
+$$
+\log \sum_j \exp(o_j)\exp(c) = \log\Big(\exp(c)\sum_j \exp(o_j)\Big)
+= c + \log \sum_j \exp(o_j)
+$$
+
+Substitute back:
+
+$$
+\ell' = c + \log \sum_j \exp(o_j) - o_y - c
+= \log \sum_j \exp(o_j) - o_y = \ell
+$$
+
+The $+c$ in the logsumexp cancels the $-c$ in the target logit.
+
+Same fact from the softmax view: softmax is shift-invariant,
+
+$$
+\frac{\exp(o_j + c)}{\sum_k \exp(o_k + c)}
+= \frac{\exp(c)\exp(o_j)}{\exp(c)\sum_k \exp(o_k)}
+= \frac{\exp(o_j)}{\sum_k \exp(o_k)}
+$$
+
+so the probabilities, and therefore $-\log p_y$, are identical.
+
+Consequences:
+- Choosing $c = -\max_j o_j$ is free: the loss is unchanged but the largest
+  exponent is $\exp(0) = 1$, so nothing overflows (the stability trick above).
+- The constant must be the **same for every class** in one example. Shifts that
+  differ per class (e.g. adding a bias vector) do change the loss.
+- Different examples may use different constants, which is why the max is
+  taken per example (over the vocab axis), not over the whole batch.
+
+## SGD learning-rate tuning (learning_rate_tuning)
+
+Toy problem from the assignment: `weights = 5 * randn(10, 10)`, loss
+`mean(weights**2)`, SGD with step size `lr / sqrt(t + 1)`, 10 iterations
+(seed 0, starting loss 26.27).
+
+| lr | Loss at steps 0 -> 9 | Behavior |
+|---|---|---|
+| 1 | 26.3 -> 21.7 | Decays, but slowly |
+| 1e1 | 26.3 -> 3.5 | Decays faster |
+| 1e2 | 26.3 -> 2e-23 | Collapses to about zero within about 5 steps |
+| 1e3 | 26.3 -> 2.4e18 | Diverges, grows by orders of magnitude each step |
+
+**Why.** The gradient of `mean(w^2)` over 100 entries is `2w / 100`, so one
+step is
+
+$$
+w \leftarrow w\left(1 - \frac{lr_t}{50}\right), \qquad lr_t = \frac{lr}{\sqrt{t+1}}
+$$
+
+Every weight is multiplied by the same factor, so the loss is multiplied by
+$(1 - lr_t/50)^2$ each step.
+- Small lr: factor close to 1, slow decay.
+- lr = 100: at step 0, $lr_t = 100$, so the factor is $1 - 100/50 = -1$.
+  The weights flip sign and the loss at step 1 equals step 0. At step 2,
+  $lr_t = 100/\sqrt{2} \approx 70.7$ gives factor about $-0.41$, so the loss
+  drops by $0.41^2 \approx 0.17$ (26.3 -> 4.5), then keeps collapsing.
+- lr = 1000: $|factor| \gg 1$, so the weights overshoot and grow every step:
+  divergence.
+
+Rule: for a quadratic loss, SGD converges only if $|1 - lr_t \cdot curvature| < 1$.
+Too small is slow, too large diverges, and the best value sits in between.
+The `1/sqrt(t+1)` decay eventually shrinks any step size, but not before
+a too-large lr has already blown the loss up (as with lr = 1e3).
+
+## AdamW peak memory (adamw_accounting a)
+
+Let `B = batch_size`, `T = context_length`, `L = num_layers`,
+`d = d_model`, `h = num_heads`, and `V = vocab_size`. Use
+`d_ff = 8d/3`, as specified in the problem. The expressions below count
+float32 values; multiply by 4 to get bytes.
+
+The parameter count, keeping `d_ff` explicit, is
+
+$$
+P = 2Vd + L(4d^2 + 3d\,d_{ff} + 2d) + d
+$$
+
+The terms are the input embedding and LM head (`2Vd`), each block's attention
+(`4d^2`), SwiGLU weights (`3d d_ff`), and two RMSNorms (`2d`), and the final
+RMSNorm (`d`). Substituting the problem's `d_ff = 8d/3` gives
+`P = 2Vd + L(12d^2 + 2d) + d`. The earlier GPT-2 XL count
+`P = 1,640,452,800` uses the rounded width `d_ff = 4,288`; the exact `8d/3`
+assumption gives a slightly different parameter count.
+
+| Memory component | Float32 values |
+| --- | ---: |
+| Parameters | $P$ |
+| Gradients | $P$ |
+| AdamW optimizer state (`m` and `v`) | $2P$ |
+
+For activations, count the outputs of the components listed in the problem.
+Within one block:
+
+| Component | Float32 values |
+| --- | ---: |
+| Two RMSNorms | $2BTd$ |
+| Q, K, V projections | $3BTd$ |
+| $QK^\top$ scores and softmax | $2BhT^2$ |
+| Weighted sum of values | $BTd$ |
+| Attention output projection | $BTd$ |
+| SwiGLU: $W_1$, $W_2$, SiLU, elementwise product | $4BTd_{ff}$ |
+| SwiGLU output projection $W_3$ | $BTd$ |
+| **Per-block total** | $\frac{56}{3}BTd + 2BhT^2$ |
+
+Across the model, include the final RMSNorm (`BTd`), the output projection
+logits (`BTV`), and one logits-sized cross-entropy working tensor (`BTV`,
+e.g. the shifted logits in the simple implementation). Thus
+
+$$
+A = L\left(\frac{56}{3}BTd + 2BhT^2\right) + BTd + 2BTV
+$$
+
+The simple total is
+
+$$
+\text{total float32 values} = P + A + P + 2P = 4P + A,
+\qquad
+\text{total bytes} = 16P + 4A.
+$$
+
+The activations depend on batch size; parameters, gradients, and optimizer
+state do not. This is the assignment's component-counting estimate, not an
+exact runtime peak: actual peak depends on which intermediates are retained or
+freed during forward and backward.
+
+### GPT-2 XL-shaped model (adamw_accounting b)
+
+Use `V = 50,257`, `T = 1,024`, `L = 48`, `d = 1,600`, `h = 25`, and
+`d_ff = 4,288`. Substituting these into the part (a) formulas gives
+`P = 1,640,452,800` parameters and `A = 4,089,153,536 × batch_size`
+activation float32 values. Therefore
+
+$$
+\text{memory}(\mathtt{batch\_size})
+= 4(4P + A)
+= 26,247,244,800 \text{ bytes}
+ + (16,356,614,144 \text{ bytes}) \times \text{batch\_size}
+$$
+
+In decimal gigabytes, this is approximately
+`26.2472 GB + 16.3566 GB × batch_size`. At batch size 3, the estimate is about
+75.32 GB; at batch size 4, it is about 91.67 GB. Thus the maximum batch size
+under an 80 GB limit is **3**.
+
+### How large models are trained in practice
+
+The batch size of 3 above is the assignment's naive setup: fp32, every
+activation stored, one GPU. It is a per-GPU micro-batch, not what people train
+with. Large LM training uses a *global* batch of roughly 0.5M to 4M tokens per
+step (GPT-3's largest model used about 3.2M). The handout's 1024 sequences of
+1024 tokens is about 1M tokens. A batch of 3 sequences (about 3K tokens) gives
+noisy gradients and poor GPU utilization.
+
+Techniques used to get there:
+
+1. **Gradient accumulation.** Run several micro-batches, summing gradients, then
+   call `optimizer.step()` once. Memory stays at the micro-batch level; the
+   effective batch is `micro_batch * accum_steps`. Reaching 1024 from a
+   micro-batch of 3 would take about 340 accumulation steps. Divide each
+   micro-batch loss by `accum_steps` so the summed gradient is the mean.
+2. **Data parallelism.** Each GPU processes its own micro-batch and gradients are
+   averaged across GPUs (e.g. 128 GPUs x 8 sequences = 1024).
+3. **Sharding (ZeRO / FSDP).** Split the `16P` bytes of parameters, gradients and
+   Adam state across GPUs instead of replicating them, freeing memory for
+   activations.
+4. **Mixed precision (bf16/fp16).** Forward and backward use 2-byte activations,
+   roughly halving activation memory and speeding up compute. Master weights and
+   Adam moments are usually kept in fp32.
+5. **Activation checkpointing.** Store only some activations and recompute the
+   rest during backward, trading about 30% extra compute for much less memory.
+6. **FlashAttention.** Avoids materializing the `B * h * T^2` attention scores
+   and softmax, which are the `2BhT^2` per-layer term in the formula above.
+
+For GPT-2 XL, activations (about 16 GB per sequence) dominate the fixed 26 GB,
+so activation techniques (3-6) help the most per sequence. For this
+assignment's own runs, gradient accumulation is the simplest to add to the
+training loop.
+
+Cross-check: public CS336 write-ups
+([m2214x](https://github.com/m2214x/cs336-assignment1/blob/main/solution.md),
+[k-ye](https://github.com/k-ye/OpenCourses/blob/master/Stanford/CS336/assignment1-basics/writeups.md))
+also report a maximum batch size of 3 under the 80 GB limit.
+
+### AdamW FLOPs per step (adamw_accounting c)
+
+Count elementwise operations per parameter. Scalars that are the same for
+every parameter (`1 - beta1`, `1 - beta2`, `alpha_t`, `alpha * lambda`) are
+computed once and are negligible.
+
+| Update | Operations | FLOPs |
+| --- | --- | ---: |
+| $m \leftarrow \beta_1 m + (1-\beta_1) g$ | $\beta_1 m$, $(1-\beta_1)g$, add | 3 |
+| $v \leftarrow \beta_2 v + (1-\beta_2) g^2$ | $g^2$, $\beta_2 v$, $(1-\beta_2)g^2$, add | 4 |
+| $\theta \leftarrow \theta - \alpha_t \frac{m}{\sqrt{v}+\epsilon}$ | $\sqrt{v}$, $+\epsilon$, divide, $\times\alpha_t$, subtract | 5 |
+| $\theta \leftarrow \theta - \alpha\lambda\theta$ | $\alpha\lambda\theta$, subtract | 2 |
+| **Total per parameter** | | **14** |
+
+So one AdamW step costs about $14P$ FLOPs. For GPT-2 XL,
+$P = 1,640,452,800$, giving $14P \approx 2.30 \times 10^{10}$ FLOPs.
+
+The exact constant depends on counting conventions (for example whether the
+square root and division count as one FLOP each, or how scalar terms are
+folded); public write-ups report 13 or 14. The point is that the cost is a small
+constant times $P$. It is negligible next to the forward and backward pass,
+which cost on the order of $10^{15}$ FLOPs per step at batch size 1024.
+
+
+### Training time on one H100 (adamw_accounting d)
+
+"Backward = 2x forward" applies to the model's forward pass only. The optimizer
+is a separate cost added on top:
+
+$$
+\text{FLOPs per step} = F + 2F + 14P = 3F + 14P
+$$
+
+GPT-2 XL, batch 1,024, context 1,024:
+- Forward per sequence: 3,516,769,894,400 FLOPs, so $F = 1024 \times$ that
+  $= 3.601 \times 10^{15}$.
+- $3F = 1.0804 \times 10^{16}$; $14P = 2.30 \times 10^{10}$, about
+  0.0002% of the step, so it is negligible.
+- Per step: $\approx 1.0804 \times 10^{16}$ FLOPs.
+
+Throughput: H100 peak 495 TFLOP/s at 50% MFU gives $247.5 \times 10^{12}$
+FLOP/s.
+
+$$
+\text{time} = \frac{400{,}000 \times 1.0804 \times 10^{16}}{2.475 \times 10^{14}}
+\approx 1.746 \times 10^{7}\ \text{s} \approx 4{,}850\ \text{hours}
+\approx 202\ \text{days}
+$$
+
+So training GPT-2 XL this way on a single GPU takes about 6.6 months, which is
+why large models are trained on many GPUs in parallel.
