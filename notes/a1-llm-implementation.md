@@ -504,3 +504,95 @@ scores are quadratic (256x), so they take over:
 
 Long contexts make attention the bottleneck, which is why FlashAttention and
 sparse or linear attention variants matter.
+
+## Cross-entropy loss: derivation
+
+For one example with logits $o \in \mathbb{R}^V$ and target class $y$
+(an integer index, not a one-hot vector):
+
+$$
+\ell = -\log \operatorname{softmax}(o)_y
+     = -\log \frac{\exp(o_y)}{\sum_{j} \exp(o_j)}
+$$
+
+Split the log of the quotient:
+
+$$
+\ell = -\big[\log \exp(o_y) - \log \sum_j \exp(o_j)\big]
+     = -o_y + \log \sum_j \exp(o_j)
+$$
+
+The `log` and `exp` cancel on the target term. So:
+
+$$
+\boxed{\ell = \underbrace{\log \sum_j \exp(o_j)}_{\text{normalization (logsumexp)}}
+\;-\; \underbrace{o_y}_{\text{correct logit}}}
+$$
+
+Intuition: the loss is small when the correct logit is large compared to the
+logsumexp of all logits (a smooth maximum). It is zero only in the limit
+where $o_y$ dominates all other logits.
+
+**Numerical stability.** Subtract $m = \max_j o_j$ from every logit first:
+
+$$
+\log \sum_j \exp(o_j) = m + \log \sum_j \exp(o_j - m),
+\qquad o_y = m + (o_y - m)
+$$
+
+The $m$ cancels in $\ell$, so the loss is unchanged, but $\exp$ never sees a
+large positive number (no overflow).
+
+**Implementation notes**
+- Targets are class ids with shape `(batch, ...)`; logits are
+  `(batch, ..., vocab)`. No one-hot conversion is needed.
+- Pick the correct logit with `gather`:
+  `shifted.gather(-1, target.unsqueeze(-1)).squeeze(-1)`
+  (see `tensor-operations.md`).
+- The loss to report is the **mean** over all batch positions.
+- Compute in float32 if the logits are bf16/fp16 (see the precision section).
+- Never form the softmax probabilities and then take the log: that loses
+  precision when probabilities are tiny. Using logsumexp avoids it.
+
+### Why adding a constant to the logits doesn't change the loss
+
+Let $o'_j = o_j + c$ for every $j$ (the same constant $c$ for all classes).
+Start from $\ell = \log \sum_j \exp(o_j) - o_y$ and plug in $o'$:
+
+$$
+\ell' = \log \sum_j \exp(o_j + c) - (o_y + c)
+$$
+
+Factor $\exp(c)$ out of the sum, since $\exp(o_j + c) = \exp(o_j)\exp(c)$:
+
+$$
+\log \sum_j \exp(o_j)\exp(c) = \log\Big(\exp(c)\sum_j \exp(o_j)\Big)
+= c + \log \sum_j \exp(o_j)
+$$
+
+Substitute back:
+
+$$
+\ell' = c + \log \sum_j \exp(o_j) - o_y - c
+= \log \sum_j \exp(o_j) - o_y = \ell
+$$
+
+The $+c$ in the logsumexp cancels the $-c$ in the target logit.
+
+Same fact from the softmax view: softmax is shift-invariant,
+
+$$
+\frac{\exp(o_j + c)}{\sum_k \exp(o_k + c)}
+= \frac{\exp(c)\exp(o_j)}{\exp(c)\sum_k \exp(o_k)}
+= \frac{\exp(o_j)}{\sum_k \exp(o_k)}
+$$
+
+so the probabilities, and therefore $-\log p_y$, are identical.
+
+Consequences:
+- Choosing $c = -\max_j o_j$ is free: the loss is unchanged but the largest
+  exponent is $\exp(0) = 1$, so nothing overflows (the stability trick above).
+- The constant must be the **same for every class** in one example. Shifts that
+  differ per class (e.g. adding a bias vector) do change the loss.
+- Different examples may use different constants, which is why the max is
+  taken per example (over the vocab axis), not over the whole batch.

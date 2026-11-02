@@ -129,6 +129,42 @@ result.shape = idx.shape + remaining axes
 - `[:token_positions]` (slice with a tensor bound) is a bug; use
   `[token_positions]`.
 
+### `tensor.gather(dim, index)`
+
+Pick **one entry per position** along `dim`, where `index` says which entry.
+Unlike `t[idx]` (which picks whole rows), `gather` picks individual elements
+and keeps the other axes aligned.
+
+```
+out[i][j][k] = t[i][j][ index[i][j][k] ]     # dim = 2
+```
+
+Rules:
+- `index` must have the **same number of dimensions** as `t`.
+- `out.shape == index.shape`.
+- Along every dim except `dim`, `index` must be no larger than `t`.
+- Index values must be in `[0, t.shape[dim])` and have dtype int64.
+
+Example, pick the correct-class logit (the cross-entropy use case):
+
+```python
+logits: (batch, vocab)
+target: (batch,)               # class ids
+logits.gather(-1, target.unsqueeze(-1))   # (batch, 1)
+logits.gather(-1, target.unsqueeze(-1)).squeeze(-1)   # (batch,)
+```
+
+- `unsqueeze(-1)` is needed because `index` must have the same rank as
+  `logits`; `squeeze(-1)` removes the size-1 axis afterwards.
+- Works with extra leading dims: `logits: (batch, seq, vocab)`,
+  `target: (batch, seq)` gives `(batch, seq)`.
+- `torch.take_along_dim(t, idx, dim)` is the same idea; it also broadcasts
+  `idx` against `t` on the non-`dim` axes.
+- `gather` vs. `t[idx]`: `t[idx]` replaces an axis with `idx`'s shape and
+  keeps all remaining axes in full (whole rows). `gather` selects single
+  elements, one per `index` entry.
+- Gradients flow back only to the selected elements.
+
 ## Elementwise ops and broadcasting
 
 - `+ - * / **` and `.cos()`, `.sin()`, `.sqrt()`, `.pow()` act per element.
