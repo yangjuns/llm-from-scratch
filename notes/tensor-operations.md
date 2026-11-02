@@ -479,3 +479,20 @@ torch.tril(torch.ones(3, 3)).bool()  # lower triangle True
 
 - `M(x)` calls `Module.__call__`, which runs hooks and then `forward`.
   `M.forward(x)` skips the hooks, so always use `M(x)`.
+
+## `torch.zeros_like`
+
+Returns a new tensor of zeros with the same shape, dtype, device, and layout
+as the input. It has `requires_grad=False` by default.
+
+```python
+p = torch.randn(2, 3, device="cuda", dtype=torch.float16)
+torch.zeros_like(p)   # zeros, (2, 3), cuda, float16
+torch.zeros(p.shape)  # zeros, (2, 3), but cpu, float32
+```
+
+- `torch.zeros(shape)` always gives CPU float32, so mixing it with CUDA tensors
+  raises a device mismatch error.
+- Use it for optimizer state (AdamW `m`, `v`) so the state matches the
+  parameter: `m = state.get("m", torch.zeros_like(p))`.
+- Siblings: `ones_like`, `empty_like`, `full_like`, `rand_like`, `randn_like`.
