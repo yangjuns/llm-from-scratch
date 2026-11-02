@@ -74,3 +74,21 @@ class AdamW(torch.optim.Optimizer):
                 p.sub_(adjusted_lr * m / (torch.sqrt(v) + eps))
                 state["t"] = t + 1
         return loss
+
+
+def cosine_annealing_lr_schedule(
+    t: int, lr_max: float, lr_min: float, warm_up_iters: int, cycle_iters: int
+) -> float:
+    # Warmup phase
+    if t < warm_up_iters:
+        return lr_max * t / warm_up_iters
+    # Cosine annealing phase
+    if warm_up_iters <= t and t <= cycle_iters:
+        return lr_min + 0.5 * (lr_max - lr_min) * (
+            1
+            + math.cos(
+                math.pi * (t - warm_up_iters) / (cycle_iters - warm_up_iters)
+            )
+        )
+    # Post annealing phase
+    return lr_min
