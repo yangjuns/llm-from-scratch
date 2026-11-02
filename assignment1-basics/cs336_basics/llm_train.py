@@ -1,7 +1,7 @@
 import torch
 import math
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 
 
 def cross_entropy(logits: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
@@ -92,3 +92,15 @@ def cosine_annealing_lr_schedule(
         )
     # Post annealing phase
     return lr_min
+
+
+def gradiant_clip(parameters: Iterable[torch.nn.Parameter], max_l2_norm: float):
+    eps = 1e-6
+    grads = [p.grad.flatten() for p in parameters if p.grad is not None]
+    all_grads = torch.cat(grads)
+    # Compute the l2 norm for all paramaters
+    total_norm: float = float(all_grads.norm())  # type: ignore
+    for p in parameters:
+        if p.grad is not None:
+            if total_norm > max_l2_norm:
+                p.grad.mul_(max_l2_norm / (total_norm + eps))
