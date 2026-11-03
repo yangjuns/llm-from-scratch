@@ -63,7 +63,8 @@ def parse_args() -> argparse.Namespace:
         "--device", default="cuda" if torch.cuda.is_available() else "cpu"
     )
     p.add_argument("--seed", type=int, default=0)
-    p.add_argument("--wandb-project", default=None)
+    p.add_argument("--wandb-project", default="cs336-assignment1")
+    p.add_argument("--wandb-entity", default="yangjuns-cmu-google")
     p.add_argument("--run-name", default=None)
     return p.parse_args()
 
@@ -77,7 +78,9 @@ def evaluate(
     model.eval()
     losses = []
     for _ in range(args.eval_batches):
-        x, y = load_data(data, args.batch_size, args.context_length, args.device)
+        x, y = load_data(
+            data, args.batch_size, args.context_length, args.device
+        )
         losses.append(cross_entropy(model(x), y.long()).item())
     model.train()
     return float(np.mean(losses))
@@ -120,7 +123,10 @@ def main() -> None:
         import wandb
 
         wandb.init(
-            project=args.wandb_project, name=args.run_name, config=vars(args)
+            project=args.wandb_project,
+            entity=args.wandb_entity,
+            name=args.run_name,
+            config=vars(args),
         )
 
     args.checkpoint_dir.mkdir(parents=True, exist_ok=True)
@@ -152,9 +158,14 @@ def main() -> None:
         if step % args.log_interval == 0:
             elapsed = time.time() - start_time
             metrics.update(train_loss=loss.item(), lr=lr, elapsed_s=elapsed)
+            mem_msg = ""
+            if torch.device(args.device).type == "cuda":
+                peak_gb = torch.cuda.max_memory_allocated(args.device) / 1e9
+                metrics["peak_gpu_mem_gb"] = peak_gb
+                mem_msg = f" | peak mem {peak_gb:.2f}GB"
             print(
                 f"step {step} | loss {loss.item():.4f} | lr {lr:.2e} "
-                f"| {elapsed:.0f}s",
+                f"| {elapsed:.0f}s{mem_msg}",
                 flush=True,
             )
         if step % args.eval_interval == 0 or step == args.max_iters:
