@@ -1,4 +1,5 @@
 import argparse
+import shutil
 import time
 from pathlib import Path
 
@@ -51,7 +52,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--eval-batches", type=int, default=20)
     # Checkpointing
     p.add_argument("--checkpoint-dir", type=Path, default=Path("checkpoints"))
-    p.add_argument("--checkpoint-interval", type=int, default=500)
+    p.add_argument("--checkpoint-interval", type=int, default=5000)
     p.add_argument(
         "--resume",
         type=Path,
@@ -189,9 +190,9 @@ def main() -> None:
         if use_wandb and metrics:
             wandb.log(metrics, step=step)
         if step % args.checkpoint_interval == 0 or step == args.max_iters:
-            save_checkpoint(
-                model, optimizer, step, args.checkpoint_dir / "latest.pt"
-            )
+            numbered = args.checkpoint_dir / f"step_{step:06d}.pt"
+            save_checkpoint(model, optimizer, step, numbered)
+            shutil.copyfile(numbered, args.checkpoint_dir / "latest.pt")
 
     if use_wandb:
         wandb.finish()
