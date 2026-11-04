@@ -65,6 +65,11 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--wandb-project", default="cs336-assignment1")
     p.add_argument("--wandb-entity", default="yangjuns-cmu-google")
+    p.add_argument(
+        "--wandb-run-id",
+        default=None,
+        help="Resume this W&B run; requires --resume",
+    )
     p.add_argument("--run-name", default=None)
     return p.parse_args()
 
@@ -88,6 +93,9 @@ def evaluate(
 
 def main() -> None:
     args = parse_args()
+    if args.wandb_run_id is not None and args.resume is None:
+        raise ValueError("--wandb-run-id requires --resume")
+
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
 
@@ -126,6 +134,12 @@ def main() -> None:
             project=args.wandb_project,
             entity=args.wandb_entity,
             name=args.run_name,
+            id=args.wandb_run_id,
+            resume_from=(
+                f"{args.wandb_run_id}?_step={start_iter}"
+                if args.wandb_run_id is not None
+                else None
+            ),
             config=vars(args),
         )
 
