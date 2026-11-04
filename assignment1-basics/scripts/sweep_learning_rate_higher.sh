@@ -18,7 +18,7 @@ for settings in "1e-2 1e-3" "3e-2 3e-3"; do
         --max-lr "$max_lr" \
         --min-lr "$min_lr" \
         --cosine-iters "$max_iters" \
-        --log-interval 100 \
+        --log-interval 10 \
         --eval-interval 500 \
         --checkpoint-interval 1000 \
         --checkpoint-dir "checkpoints/$run_name" \
