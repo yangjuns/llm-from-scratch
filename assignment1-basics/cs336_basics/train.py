@@ -136,11 +136,9 @@ def main() -> None:
             entity=args.wandb_entity,
             name=args.run_name,
             id=args.wandb_run_id,
-            resume_from=(
-                f"{args.wandb_run_id}?_step={start_iter}"
-                if args.wandb_run_id is not None
-                else None
-            ),
+            # Rewind (resume_from) is private preview, so append instead:
+            # logs for steps <= the run's last logged step are dropped.
+            resume="must" if args.wandb_run_id is not None else None,
             config=vars(args),
         )
 
