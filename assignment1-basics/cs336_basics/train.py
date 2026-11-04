@@ -33,12 +33,6 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--max-lr", type=float, default=1e-3)
     p.add_argument("--min-lr", type=float, default=1e-4)
     p.add_argument("--warmup-iters", type=int, default=200)
-    p.add_argument(
-        "--cosine-iters",
-        type=int,
-        default=None,
-        help="Iterations for cosine annealing (default: --max-iters)",
-    )
     p.add_argument("--weight-decay", type=float, default=0.1)
     p.add_argument("--beta1", type=float, default=0.9)
     p.add_argument("--beta2", type=float, default=0.95)
@@ -46,7 +40,19 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--grad-clip", type=float, default=1.0)
     # Loop
     p.add_argument("--batch-size", type=int, default=32)
-    p.add_argument("--max-iters", type=int, default=5000)
+    p.add_argument(
+        "--max-iters",
+        type=int,
+        default=5000,
+        help="Total training steps; the LR schedule spans this length",
+    )
+    p.add_argument(
+        "--stop-step",
+        type=int,
+        default=None,
+        help="Stop (and checkpoint) at this step (default: --max-iters); "
+        "the LR schedule is unaffected",
+    )
     p.add_argument("--log-interval", type=int, default=10)
     p.add_argument("--eval-interval", type=int, default=250)
     p.add_argument("--eval-batches", type=int, default=20)
@@ -143,16 +149,20 @@ def main() -> None:
         )
 
     args.checkpoint_dir.mkdir(parents=True, exist_ok=True)
-    cosine_iters = args.cosine_iters or args.max_iters
+    # LR schedule always spans --max-iters, regardless of --stop-step.
     # gradiant_clip iterates its argument twice, so it needs a list.
     params = list(model.parameters())
     num_params = sum(p.numel() for p in params)
     print(f"Training {num_params:,} parameters on {args.device}")
 
     start_time = time.time()
-    for it in range(start_iter, args.max_iters):
+    end_iter = args.max_iters
+    if args.stop_step is not None:
+        end_iter = min(end_iter, args.stop_step)
+
+    for it in range(start_iter, end_iter):
         lr = cosine_annealing_lr_schedule(
-            it, args.max_lr, args.min_lr, args.warmup_iters, cosine_iters
+            it, args.max_lr, args.min_lr, args.warmup_iters, args.max_iters
         )
         for group in optimizer.param_groups:
             group["lr"] = lr
@@ -181,13 +191,13 @@ def main() -> None:
                 f"| {elapsed:.0f}s{mem_msg}",
                 flush=True,
             )
-        if step % args.eval_interval == 0 or step == args.max_iters:
+        if step % args.eval_interval == 0 or step == end_iter:
             val_loss = evaluate(model, valid_data, args)
             metrics["val_loss"] = val_loss
             print(f"step {step} | val loss {val_loss:.4f}", flush=True)
         if use_wandb and metrics:
             wandb.log(metrics, step=step)
-        if step % args.checkpoint_interval == 0 or step == args.max_iters:
+        if step % args.checkpoint_interval == 0 or step == end_iter:
             numbered = args.checkpoint_dir / f"step_{step:06d}.pt"
             save_checkpoint(model, optimizer, step, numbered)
             shutil.copyfile(numbered, args.checkpoint_dir / "latest.pt")
