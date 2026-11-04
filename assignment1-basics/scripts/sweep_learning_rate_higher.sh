@@ -13,6 +13,7 @@ for settings in "1e-2 1e-3" "3e-2 3e-3"; do
     uv run python -m cs336_basics.train \
         --train-data data/tokenized/tinystories_train.npy \
         --valid-data data/tokenized/tinystories_valid.npy \
+        --seed 0 \
         --batch-size 32 \
         --max-iters "$max_iters" \
         --max-lr "$max_lr" \
