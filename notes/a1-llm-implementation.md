@@ -511,7 +511,7 @@ For one example with logits $o \in \mathbb{R}^V$ and target class $y$
 (an integer index, not a one-hot vector):
 
 $$
-\ell = -\log \operatorname{softmax}(o)_y
+\ell = -\log \mathrm{softmax}(o)_y
      = -\log \frac{\exp(o_y)}{\sum_{j} \exp(o_j)}
 $$
 
