@@ -17,6 +17,17 @@ TinyStories language model from `assignment1-basics/` (details in [LLM experimen
 | Training hardware | 1× NVIDIA RTX 4090 (24 GB), FP32 |
 | Training time | 3,178 s (about 53 min) |
 
+Sample generated from this checkpoint (prompt `<|endoftext|>`, temperature 0.8, top-p 0.9, seed 0; stopped at the model's own `<|endoftext|>`):
+
+```text
+<|endoftext|>
+Once upon a time, there was a little girl named Lucy. She had a pretty skirt that she loved very much. One day, she wanted to wear her skirt to play outside with her friends.
+While playing, Lucy fell down and hurt her knee. She started to cry. Her mom heard her and came to help her. "Don't worry, Lucy," her mom said. "We can fix your knee and make it feel better."
+Lucy's mom took out some soft cloth and wrapped it around her knee. She kissed it and said, "There, all better now. Let's go to the doctor."
+At the doctor, the doctor looked at Lucy's knee and said, "You need to rest and rest. You will feel better soon." Lucy felt a little better. She went back to her friends and they all played together again.
+<|endoftext|>
+```
+
 ## Learning Notes
 
 Write-ups of what I measured and learned along the way. Naming: `aN-<topic>.md` per assignment.
