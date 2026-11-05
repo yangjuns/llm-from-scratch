@@ -15,12 +15,16 @@ def decode(
     # encode prompt into token tensors of shape (1, seq_len)
     tokens: list[int] = tok.encode(prompt)
 
+    device = next(model.parameters()).device
     generated_count = 0
     while generated_count < max_num_generated_tokens:
         # run model on tokens
-        logits = model(
-            torch.tensor(tokens).unsqueeze(0)  # shape (1, seq_len)
-        )  # shape (1, seq_len, vocab_size)
+        # Only the last context_length tokens fit in the model's window.
+        context = tokens[-model.context_length :]
+        with torch.no_grad():
+            logits = model(
+                torch.tensor(context, device=device).unsqueeze(0)
+            )  # shape (1, seq_len, vocab_size)
         # pick the last token logits
         last_logits = logits[:, -1, :]  # shape (1, vocab_size)
         # temperature scaling with softmax
@@ -44,7 +48,7 @@ def decode(
         # Map to original vocabulary indices
         token_id: int = sorted_indices.gather(-1, sampled_index).item()
         tokens.append(token_id)
-        if tok.decode([token_id]) == "<|endoftext|">:
+        if tok.decode([token_id]) == "<|endoftext|>":
             break
         generated_count += 1
 
