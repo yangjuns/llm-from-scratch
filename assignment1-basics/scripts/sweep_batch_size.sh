@@ -64,6 +64,8 @@ for batch_size in "${batch_sizes[@]}"; do
         --checkpoint-interval "$checkpoint_interval" \
         --checkpoint-dir "checkpoints/batch-${batch_size}-lr-1e-3" \
         --run-name "batch-${batch_size}-lr-1e-3" \
+        --wandb-project cs336-assignment1 \
+        --wandb-entity yangjuns-cmu-google \
         2>&1 | tee "$log_file"; then
         echo "Completed batch size ${batch_size}."
     else

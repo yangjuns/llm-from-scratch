@@ -70,8 +70,8 @@ def parse_args() -> argparse.Namespace:
         "--device", default="cuda" if torch.cuda.is_available() else "cpu"
     )
     p.add_argument("--seed", type=int, default=0)
-    p.add_argument("--wandb-project", default="cs336-assignment1")
-    p.add_argument("--wandb-entity", default="yangjuns-cmu-google")
+    p.add_argument("--wandb-project", default=None)
+    p.add_argument("--wandb-entity", default=None)
     p.add_argument(
         "--wandb-run-id",
         default=None,

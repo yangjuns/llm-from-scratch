@@ -25,5 +25,7 @@ for settings in "1e-2 1e-3" "3e-2 3e-3"; do
         --eval-interval 500 \
         --checkpoint-interval 5000 \
         --checkpoint-dir "checkpoints/$run_name" \
-        --run-name "$run_name"
+        --run-name "$run_name" \
+        --wandb-project cs336-assignment1 \
+        --wandb-entity yangjuns-cmu-google
 done
