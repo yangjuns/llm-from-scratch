@@ -84,6 +84,6 @@ def load_data(
     window_indices = start_indices[:, None] + np.arange(context_length + 1)
     windows = x[window_indices]
 
-    inputs = torch.as_tensor(windows[:, :-1], dtype=torch.int, device=device)
-    targets = torch.as_tensor(windows[:, 1:], dtype=torch.int, device=device)
+    inputs = torch.as_tensor(windows[:, :-1], dtype=torch.long, device=device)
+    targets = torch.as_tensor(windows[:, 1:], dtype=torch.long, device=device)
     return inputs, targets
