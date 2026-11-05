@@ -46,7 +46,7 @@ def load_checkpoint(
     Returns:
         The number of training iterations completed when the checkpoint was saved.
     """
-    checkpoint = torch.load(src)
+    checkpoint = torch.load(src, map_location="cpu")
     model.load_state_dict(checkpoint["model"])
     optimizer.load_state_dict(checkpoint["optimizer"])
     return checkpoint["iteration"]
