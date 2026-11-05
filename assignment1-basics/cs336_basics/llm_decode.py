@@ -4,6 +4,7 @@ import torch
 from cs336_basics import tokenizer
 
 
+@torch.no_grad()
 def decode(
     model: llm.TransformerLM,
     tok: tokenizer.Tokenizer,
