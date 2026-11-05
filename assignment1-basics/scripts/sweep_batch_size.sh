@@ -21,6 +21,8 @@ baseline_steps=40000
 baseline_batch_size=32
 context_length=256
 baseline_warmup_iters=200
+baseline_checkpoint_interval=500
+run_time_limit=1h
 target_tokens=$((baseline_steps * baseline_batch_size * context_length))
 
 uv run python -c \
@@ -36,7 +38,7 @@ for batch_size in "${batch_sizes[@]}"; do
     warmup_iters=$(((baseline_warmup_iters * baseline_batch_size + batch_size / 2) / batch_size))
     log_interval=$(((10 * baseline_batch_size + batch_size / 2) / batch_size))
     eval_interval=$(((500 * baseline_batch_size + batch_size / 2) / batch_size))
-    checkpoint_interval=$(((5000 * baseline_batch_size + batch_size / 2) / batch_size))
+    checkpoint_interval=$(((baseline_checkpoint_interval * baseline_batch_size + batch_size / 2) / batch_size))
 
     (( max_iters > 0 )) || max_iters=1
     (( warmup_iters > 0 )) || warmup_iters=1
@@ -46,7 +48,8 @@ for batch_size in "${batch_sizes[@]}"; do
 
     echo "Batch size ${batch_size}: ${max_iters} steps (about $((max_iters * tokens_per_step)) tokens)"
     log_file="$log_dir/batch-${batch_size}.log"
-    if uv run python -m cs336_basics.train \
+    if timeout --signal=TERM --kill-after=30s "$run_time_limit" \
+        uv run python -m cs336_basics.train \
         --device cuda \
         --train-data data/tokenized/tinystories_train.npy \
         --valid-data data/tokenized/tinystories_valid.npy \
@@ -65,7 +68,11 @@ for batch_size in "${batch_sizes[@]}"; do
         echo "Completed batch size ${batch_size}."
     else
         status=$?
-        echo "Run failed at batch size ${batch_size} (exit ${status}). See ${log_file}; stopping the sweep."
-        exit "$status"
+        if (( status == 124 )); then
+            echo "Batch size ${batch_size} reached the ${run_time_limit} limit; continuing to the next size."
+        else
+            echo "Run failed at batch size ${batch_size} (exit ${status}). See ${log_file}; stopping the sweep."
+            exit "$status"
+        fi
     fi
 done
