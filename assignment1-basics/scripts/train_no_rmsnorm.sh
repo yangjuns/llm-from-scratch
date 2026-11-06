@@ -12,7 +12,8 @@ for settings in "1e-3 1e-4" "1e-4 1e-5"; do
     run_name="no-rmsnorm-lr-${max_lr}"
 
     # timeout exits with 124 when the cap is hit; that is expected, not a failure
-    timeout "$time_limit" uv run python -m cs336_basics.train \
+    # --foreground keeps Ctrl-C and tty prompts working
+    timeout --foreground "$time_limit" uv run python -m cs336_basics.train \
         --train-data data/tokenized/tinystories_train.npy \
         --valid-data data/tokenized/tinystories_valid.npy \
         --no-rmsnorm \
