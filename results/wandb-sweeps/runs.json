@@ -1,0 +1,2000 @@
+{
+  "entity": "yangjuns-cmu-google",
+  "project": "cs336-assignment1",
+  "exported_at_utc": "2026-11-06T04:53:31.551947+00:00",
+  "source": "W&B GraphQL history, unsampled step windows; downloaded row counts checked against W&B historyKeys numeric _step counts",
+  "history_csv_columns": [
+    "_step",
+    "_timestamp",
+    "_runtime",
+    "train_loss",
+    "val_loss",
+    "lr",
+    "elapsed_s",
+    "peak_gpu_mem_gb"
+  ],
+  "runs": [
+    {
+      "id": "sya3qpqg",
+      "name": "batch-64-lr-1e-3",
+      "state": "finished",
+      "config": {
+        "eps": {
+          "value": 1e-08
+        },
+        "d_ff": {
+          "value": 1344
+        },
+        "seed": {
+          "value": 0
+        },
+        "beta1": {
+          "value": 0.9
+        },
+        "beta2": {
+          "value": 0.95
+        },
+        "_wandb": {
+          "value": {
+            "m": [],
+            "t": {
+              "1": [
+                1
+              ],
+              "2": [
+                1
+              ],
+              "3": [
+                2,
+                13,
+                16,
+                61
+              ],
+              "4": "3.12.15",
+              "5": "0.25.1",
+              "12": "0.25.1",
+              "13": "linux-x86_64"
+            },
+            "cli_version": "0.25.1",
+            "python_version": "3.12.15"
+          }
+        },
+        "device": {
+          "value": "cuda"
+        },
+        "max_lr": {
+          "value": 0.001
+        },
+        "min_lr": {
+          "value": 0.0001
+        },
+        "resume": {
+          "value": null
+        },
+        "d_model": {
+          "value": 512
+        },
+        "run_name": {
+          "value": "batch-64-lr-1e-3"
+        },
+        "grad_clip": {
+          "value": 1
+        },
+        "max_iters": {
+          "value": 20000
+        },
+        "num_heads": {
+          "value": 16
+        },
+        "stop_step": {
+          "value": null
+        },
+        "batch_size": {
+          "value": 64
+        },
+        "num_layers": {
+          "value": 4
+        },
+        "rope_theta": {
+          "value": 10000
+        },
+        "train_data": {
+          "value": "data/tokenized/tinystories_train.npy"
+        },
+        "valid_data": {
+          "value": "data/tokenized/tinystories_valid.npy"
+        },
+        "vocab_size": {
+          "value": 10000
+        },
+        "eval_batches": {
+          "value": 20
+        },
+        "log_interval": {
+          "value": 5
+        },
+        "wandb_entity": {
+          "value": "yangjuns-cmu-google"
+        },
+        "wandb_run_id": {
+          "value": null
+        },
+        "warmup_iters": {
+          "value": 100
+        },
+        "weight_decay": {
+          "value": 0.1
+        },
+        "eval_interval": {
+          "value": 250
+        },
+        "wandb_project": {
+          "value": "cs336-assignment1"
+        },
+        "checkpoint_dir": {
+          "value": "checkpoints/batch-64-lr-1e-3"
+        },
+        "context_length": {
+          "value": 256
+        },
+        "checkpoint_interval": {
+          "value": 250
+        }
+      },
+      "summary": {
+        "_runtime": 3179.827740426,
+        "_step": 20000,
+        "_timestamp": 1793888559.7648094,
+        "_wandb.runtime": 3179,
+        "elapsed_s": 3178.412349462509,
+        "lr": 0.00010000000560758814,
+        "peak_gpu_mem_gb": 8.302779392,
+        "train_loss": 1.3844099044799805,
+        "val_loss": 1.3647269904613497
+      },
+      "last_step": 20000,
+      "history_file": "batch-64-lr-1e-3--sya3qpqg.csv",
+      "history_rows": 4000,
+      "url": "https://wandb.ai/yangjuns-cmu-google/cs336-assignment1/runs/sya3qpqg"
+    },
+    {
+      "id": "rot2j85j",
+      "name": "batch-256-lr-1e-3",
+      "state": "failed",
+      "config": {
+        "eps": {
+          "value": 1e-08
+        },
+        "d_ff": {
+          "value": 1344
+        },
+        "seed": {
+          "value": 0
+        },
+        "beta1": {
+          "value": 0.9
+        },
+        "beta2": {
+          "value": 0.95
+        },
+        "_wandb": {
+          "value": {
+            "m": [],
+            "t": {
+              "1": [
+                1
+              ],
+              "2": [
+                1
+              ],
+              "3": [
+                13,
+                16
+              ],
+              "4": "3.12.15",
+              "5": "0.25.1",
+              "12": "0.25.1",
+              "13": "linux-x86_64"
+            },
+            "cli_version": "0.25.1",
+            "python_version": "3.12.15"
+          }
+        },
+        "device": {
+          "value": "cuda"
+        },
+        "max_lr": {
+          "value": 0.001
+        },
+        "min_lr": {
+          "value": 0.0001
+        },
+        "resume": {
+          "value": null
+        },
+        "d_model": {
+          "value": 512
+        },
+        "run_name": {
+          "value": "batch-256-lr-1e-3"
+        },
+        "grad_clip": {
+          "value": 1
+        },
+        "max_iters": {
+          "value": 5000
+        },
+        "num_heads": {
+          "value": 16
+        },
+        "stop_step": {
+          "value": null
+        },
+        "batch_size": {
+          "value": 256
+        },
+        "num_layers": {
+          "value": 4
+        },
+        "rope_theta": {
+          "value": 10000
+        },
+        "train_data": {
+          "value": "data/tokenized/tinystories_train.npy"
+        },
+        "valid_data": {
+          "value": "data/tokenized/tinystories_valid.npy"
+        },
+        "vocab_size": {
+          "value": 10000
+        },
+        "eval_batches": {
+          "value": 20
+        },
+        "log_interval": {
+          "value": 1
+        },
+        "wandb_entity": {
+          "value": "yangjuns-cmu-google"
+        },
+        "wandb_run_id": {
+          "value": null
+        },
+        "warmup_iters": {
+          "value": 25
+        },
+        "weight_decay": {
+          "value": 0.1
+        },
+        "eval_interval": {
+          "value": 63
+        },
+        "wandb_project": {
+          "value": "cs336-assignment1"
+        },
+        "checkpoint_dir": {
+          "value": "checkpoints/batch-256-lr-1e-3"
+        },
+        "context_length": {
+          "value": 256
+        },
+        "checkpoint_interval": {
+          "value": 63
+        }
+      },
+      "summary": {
+        "_runtime": 0,
+        "_wandb.runtime": 0
+      },
+      "last_step": -1,
+      "history_file": "batch-256-lr-1e-3--rot2j85j.csv",
+      "history_rows": 0,
+      "url": "https://wandb.ai/yangjuns-cmu-google/cs336-assignment1/runs/rot2j85j"
+    },
+    {
+      "id": "ogtn0l5c",
+      "name": "batch-128-lr-1e-3",
+      "state": "finished",
+      "config": {
+        "eps": {
+          "value": 1e-08
+        },
+        "d_ff": {
+          "value": 1344
+        },
+        "seed": {
+          "value": 0
+        },
+        "beta1": {
+          "value": 0.9
+        },
+        "beta2": {
+          "value": 0.95
+        },
+        "_wandb": {
+          "value": {
+            "m": [],
+            "t": {
+              "1": [
+                1
+              ],
+              "2": [
+                1
+              ],
+              "3": [
+                2,
+                13,
+                16,
+                61
+              ],
+              "4": "3.12.15",
+              "5": "0.25.1",
+              "12": "0.25.1",
+              "13": "linux-x86_64"
+            },
+            "cli_version": "0.25.1",
+            "python_version": "3.12.15"
+          }
+        },
+        "device": {
+          "value": "cuda"
+        },
+        "max_lr": {
+          "value": 0.001
+        },
+        "min_lr": {
+          "value": 0.0001
+        },
+        "resume": {
+          "value": null
+        },
+        "d_model": {
+          "value": 512
+        },
+        "run_name": {
+          "value": "batch-128-lr-1e-3"
+        },
+        "grad_clip": {
+          "value": 1
+        },
+        "max_iters": {
+          "value": 10000
+        },
+        "num_heads": {
+          "value": 16
+        },
+        "stop_step": {
+          "value": null
+        },
+        "batch_size": {
+          "value": 128
+        },
+        "num_layers": {
+          "value": 4
+        },
+        "rope_theta": {
+          "value": 10000
+        },
+        "train_data": {
+          "value": "data/tokenized/tinystories_train.npy"
+        },
+        "valid_data": {
+          "value": "data/tokenized/tinystories_valid.npy"
+        },
+        "vocab_size": {
+          "value": 10000
+        },
+        "eval_batches": {
+          "value": 20
+        },
+        "log_interval": {
+          "value": 3
+        },
+        "wandb_entity": {
+          "value": "yangjuns-cmu-google"
+        },
+        "wandb_run_id": {
+          "value": null
+        },
+        "warmup_iters": {
+          "value": 50
+        },
+        "weight_decay": {
+          "value": 0.1
+        },
+        "eval_interval": {
+          "value": 125
+        },
+        "wandb_project": {
+          "value": "cs336-assignment1"
+        },
+        "checkpoint_dir": {
+          "value": "checkpoints/batch-128-lr-1e-3"
+        },
+        "context_length": {
+          "value": 256
+        },
+        "checkpoint_interval": {
+          "value": 125
+        }
+      },
+      "summary": {
+        "_runtime": 3296.188286704,
+        "_step": 10000,
+        "_timestamp": 1793891862.860106,
+        "_wandb.runtime": 3296,
+        "elapsed_s": 3292.97631573677,
+        "lr": 0.0001000000897214077,
+        "peak_gpu_mem_gb": 16.30672384,
+        "train_loss": 1.3803061246871948,
+        "val_loss": 1.3858688652515412
+      },
+      "last_step": 10000,
+      "history_file": "batch-128-lr-1e-3--ogtn0l5c.csv",
+      "history_rows": 3387,
+      "url": "https://wandb.ai/yangjuns-cmu-google/cs336-assignment1/runs/ogtn0l5c"
+    },
+    {
+      "id": "z6ch2xht",
+      "name": "batch-32-lr-1e-3",
+      "state": "finished",
+      "config": {
+        "eps": {
+          "value": 1e-08
+        },
+        "d_ff": {
+          "value": 1344
+        },
+        "seed": {
+          "value": 0
+        },
+        "beta1": {
+          "value": 0.9
+        },
+        "beta2": {
+          "value": 0.95
+        },
+        "_wandb": {
+          "value": {
+            "m": [],
+            "t": {
+              "1": [
+                1
+              ],
+              "2": [
+                1
+              ],
+              "3": [
+                2,
+                13,
+                16,
+                61
+              ],
+              "4": "3.12.15",
+              "5": "0.25.1",
+              "12": "0.25.1",
+              "13": "linux-x86_64"
+            },
+            "cli_version": "0.25.1",
+            "python_version": "3.12.15"
+          }
+        },
+        "device": {
+          "value": "cuda"
+        },
+        "max_lr": {
+          "value": 0.001
+        },
+        "min_lr": {
+          "value": 0.0001
+        },
+        "resume": {
+          "value": null
+        },
+        "d_model": {
+          "value": 512
+        },
+        "run_name": {
+          "value": "batch-32-lr-1e-3"
+        },
+        "grad_clip": {
+          "value": 1
+        },
+        "max_iters": {
+          "value": 40000
+        },
+        "num_heads": {
+          "value": 16
+        },
+        "stop_step": {
+          "value": null
+        },
+        "batch_size": {
+          "value": 32
+        },
+        "num_layers": {
+          "value": 4
+        },
+        "rope_theta": {
+          "value": 10000
+        },
+        "train_data": {
+          "value": "data/tokenized/tinystories_train.npy"
+        },
+        "valid_data": {
+          "value": "data/tokenized/tinystories_valid.npy"
+        },
+        "vocab_size": {
+          "value": 10000
+        },
+        "eval_batches": {
+          "value": 20
+        },
+        "log_interval": {
+          "value": 10
+        },
+        "wandb_entity": {
+          "value": "yangjuns-cmu-google"
+        },
+        "wandb_run_id": {
+          "value": null
+        },
+        "warmup_iters": {
+          "value": 200
+        },
+        "weight_decay": {
+          "value": 0.1
+        },
+        "eval_interval": {
+          "value": 500
+        },
+        "wandb_project": {
+          "value": "cs336-assignment1"
+        },
+        "checkpoint_dir": {
+          "value": "checkpoints/batch-32-lr-1e-3"
+        },
+        "context_length": {
+          "value": 256
+        },
+        "checkpoint_interval": {
+          "value": 500
+        }
+      },
+      "summary": {
+        "_runtime": 3246.850459275,
+        "_step": 40000,
+        "_timestamp": 1793885373.4146106,
+        "_wandb.runtime": 3246,
+        "elapsed_s": 3245.9049258232117,
+        "lr": 0.00010000000140189704,
+        "peak_gpu_mem_gb": 4.296891392,
+        "train_loss": 1.3322166204452517,
+        "val_loss": 1.3838209450244905
+      },
+      "last_step": 40000,
+      "history_file": "batch-32-lr-1e-3--z6ch2xht.csv",
+      "history_rows": 4000,
+      "url": "https://wandb.ai/yangjuns-cmu-google/cs336-assignment1/runs/z6ch2xht"
+    },
+    {
+      "id": "pp8w8c5z",
+      "name": "batch-16-lr-1e-3",
+      "state": "crashed",
+      "config": {
+        "eps": {
+          "value": 1e-08
+        },
+        "d_ff": {
+          "value": 1344
+        },
+        "seed": {
+          "value": 0
+        },
+        "beta1": {
+          "value": 0.9
+        },
+        "beta2": {
+          "value": 0.95
+        },
+        "_wandb": {
+          "value": {
+            "m": [],
+            "t": {
+              "1": [
+                1
+              ],
+              "2": [
+                1
+              ],
+              "3": [
+                13,
+                16,
+                61
+              ],
+              "4": "3.12.15",
+              "5": "0.25.1",
+              "12": "0.25.1",
+              "13": "linux-x86_64"
+            },
+            "cli_version": "0.25.1",
+            "python_version": "3.12.15"
+          }
+        },
+        "device": {
+          "value": "cuda"
+        },
+        "max_lr": {
+          "value": 0.001
+        },
+        "min_lr": {
+          "value": 0.0001
+        },
+        "resume": {
+          "value": null
+        },
+        "d_model": {
+          "value": 512
+        },
+        "run_name": {
+          "value": "batch-16-lr-1e-3"
+        },
+        "grad_clip": {
+          "value": 1
+        },
+        "max_iters": {
+          "value": 80000
+        },
+        "num_heads": {
+          "value": 16
+        },
+        "stop_step": {
+          "value": null
+        },
+        "batch_size": {
+          "value": 16
+        },
+        "num_layers": {
+          "value": 4
+        },
+        "rope_theta": {
+          "value": 10000
+        },
+        "train_data": {
+          "value": "data/tokenized/tinystories_train.npy"
+        },
+        "valid_data": {
+          "value": "data/tokenized/tinystories_valid.npy"
+        },
+        "vocab_size": {
+          "value": 10000
+        },
+        "eval_batches": {
+          "value": 20
+        },
+        "log_interval": {
+          "value": 20
+        },
+        "wandb_entity": {
+          "value": "yangjuns-cmu-google"
+        },
+        "wandb_run_id": {
+          "value": null
+        },
+        "warmup_iters": {
+          "value": 400
+        },
+        "weight_decay": {
+          "value": 0.1
+        },
+        "eval_interval": {
+          "value": 1000
+        },
+        "wandb_project": {
+          "value": "cs336-assignment1"
+        },
+        "checkpoint_dir": {
+          "value": "checkpoints/batch-16-lr-1e-3"
+        },
+        "context_length": {
+          "value": 256
+        },
+        "checkpoint_interval": {
+          "value": 1000
+        }
+      },
+      "summary": {
+        "_runtime": 3584.128908301,
+        "_step": 73960,
+        "_timestamp": 1793882109.9387784,
+        "_wandb.runtime": 3584,
+        "elapsed_s": 3583.065995693207,
+        "lr": 0.00011272962293525734,
+        "peak_gpu_mem_gb": 2.302073856,
+        "train_loss": 1.485356330871582,
+        "val_loss": 1.4746555149555207
+      },
+      "last_step": 73960,
+      "history_file": "batch-16-lr-1e-3--pp8w8c5z.csv",
+      "history_rows": 3698,
+      "url": "https://wandb.ai/yangjuns-cmu-google/cs336-assignment1/runs/pp8w8c5z"
+    },
+    {
+      "id": "6kfmz2xz",
+      "name": "batch-8-lr-1e-3",
+      "state": "crashed",
+      "config": {
+        "eps": {
+          "value": 1e-08
+        },
+        "d_ff": {
+          "value": 1344
+        },
+        "seed": {
+          "value": 0
+        },
+        "beta1": {
+          "value": 0.9
+        },
+        "beta2": {
+          "value": 0.95
+        },
+        "_wandb": {
+          "value": {
+            "m": [],
+            "t": {
+              "1": [
+                1
+              ],
+              "2": [
+                1
+              ],
+              "3": [
+                13,
+                16,
+                61
+              ],
+              "4": "3.12.15",
+              "5": "0.25.1",
+              "12": "0.25.1",
+              "13": "linux-x86_64"
+            },
+            "cli_version": "0.25.1",
+            "python_version": "3.12.15"
+          }
+        },
+        "device": {
+          "value": "cuda"
+        },
+        "max_lr": {
+          "value": 0.001
+        },
+        "min_lr": {
+          "value": 0.0001
+        },
+        "resume": {
+          "value": null
+        },
+        "d_model": {
+          "value": 512
+        },
+        "run_name": {
+          "value": "batch-8-lr-1e-3"
+        },
+        "grad_clip": {
+          "value": 1
+        },
+        "max_iters": {
+          "value": 160000
+        },
+        "num_heads": {
+          "value": 16
+        },
+        "stop_step": {
+          "value": null
+        },
+        "batch_size": {
+          "value": 8
+        },
+        "num_layers": {
+          "value": 4
+        },
+        "rope_theta": {
+          "value": 10000
+        },
+        "train_data": {
+          "value": "data/tokenized/tinystories_train.npy"
+        },
+        "valid_data": {
+          "value": "data/tokenized/tinystories_valid.npy"
+        },
+        "vocab_size": {
+          "value": 10000
+        },
+        "eval_batches": {
+          "value": 20
+        },
+        "log_interval": {
+          "value": 40
+        },
+        "wandb_entity": {
+          "value": "yangjuns-cmu-google"
+        },
+        "wandb_run_id": {
+          "value": null
+        },
+        "warmup_iters": {
+          "value": 800
+        },
+        "weight_decay": {
+          "value": 0.1
+        },
+        "eval_interval": {
+          "value": 2000
+        },
+        "wandb_project": {
+          "value": "cs336-assignment1"
+        },
+        "checkpoint_dir": {
+          "value": "checkpoints/batch-8-lr-1e-3"
+        },
+        "context_length": {
+          "value": 256
+        },
+        "checkpoint_interval": {
+          "value": 2000
+        }
+      },
+      "summary": {
+        "_runtime": 3583.953367492,
+        "_step": 81160,
+        "_timestamp": 1793878508.0822284,
+        "_wandb.runtime": 3583,
+        "elapsed_s": 3581.9347648620605,
+        "lr": 0.0005432602333399173,
+        "peak_gpu_mem_gb": 1.299913728,
+        "train_loss": 1.6796753406524658,
+        "val_loss": 1.7156856060028076
+      },
+      "last_step": 81160,
+      "history_file": "batch-8-lr-1e-3--6kfmz2xz.csv",
+      "history_rows": 2029,
+      "url": "https://wandb.ai/yangjuns-cmu-google/cs336-assignment1/runs/6kfmz2xz"
+    },
+    {
+      "id": "i3tgnaho",
+      "name": "batch-4-lr-1e-3",
+      "state": "crashed",
+      "config": {
+        "eps": {
+          "value": 1e-08
+        },
+        "d_ff": {
+          "value": 1344
+        },
+        "seed": {
+          "value": 0
+        },
+        "beta1": {
+          "value": 0.9
+        },
+        "beta2": {
+          "value": 0.95
+        },
+        "_wandb": {
+          "value": {
+            "m": [],
+            "t": {
+              "1": [
+                1
+              ],
+              "2": [
+                1
+              ],
+              "3": [
+                13,
+                16,
+                61
+              ],
+              "4": "3.12.15",
+              "5": "0.25.1",
+              "12": "0.25.1",
+              "13": "linux-x86_64"
+            },
+            "cli_version": "0.25.1",
+            "python_version": "3.12.15"
+          }
+        },
+        "device": {
+          "value": "cuda"
+        },
+        "max_lr": {
+          "value": 0.001
+        },
+        "min_lr": {
+          "value": 0.0001
+        },
+        "resume": {
+          "value": null
+        },
+        "d_model": {
+          "value": 512
+        },
+        "run_name": {
+          "value": "batch-4-lr-1e-3"
+        },
+        "grad_clip": {
+          "value": 1
+        },
+        "max_iters": {
+          "value": 320000
+        },
+        "num_heads": {
+          "value": 16
+        },
+        "stop_step": {
+          "value": null
+        },
+        "batch_size": {
+          "value": 4
+        },
+        "num_layers": {
+          "value": 4
+        },
+        "rope_theta": {
+          "value": 10000
+        },
+        "train_data": {
+          "value": "data/tokenized/tinystories_train.npy"
+        },
+        "valid_data": {
+          "value": "data/tokenized/tinystories_valid.npy"
+        },
+        "vocab_size": {
+          "value": 10000
+        },
+        "eval_batches": {
+          "value": 20
+        },
+        "log_interval": {
+          "value": 80
+        },
+        "wandb_entity": {
+          "value": "yangjuns-cmu-google"
+        },
+        "wandb_run_id": {
+          "value": null
+        },
+        "warmup_iters": {
+          "value": 1600
+        },
+        "weight_decay": {
+          "value": 0.1
+        },
+        "eval_interval": {
+          "value": 4000
+        },
+        "wandb_project": {
+          "value": "cs336-assignment1"
+        },
+        "checkpoint_dir": {
+          "value": "checkpoints/batch-4-lr-1e-3"
+        },
+        "context_length": {
+          "value": 256
+        },
+        "checkpoint_interval": {
+          "value": 4000
+        }
+      },
+      "summary": {
+        "_runtime": 3582.304738878,
+        "_step": 78400,
+        "_timestamp": 1793874904.4846373,
+        "_wandb.runtime": 3582,
+        "elapsed_s": 3578.6137778759003,
+        "lr": 0.0008768694397282408,
+        "peak_gpu_mem_gb": 0.811990016,
+        "train_loss": 2.13930082321167,
+        "val_loss": 1.9829986453056336
+      },
+      "last_step": 78400,
+      "history_file": "batch-4-lr-1e-3--i3tgnaho.csv",
+      "history_rows": 980,
+      "url": "https://wandb.ai/yangjuns-cmu-google/cs336-assignment1/runs/i3tgnaho"
+    },
+    {
+      "id": "3jil4aap",
+      "name": "batch-2-lr-1e-3",
+      "state": "crashed",
+      "config": {
+        "eps": {
+          "value": 1e-08
+        },
+        "d_ff": {
+          "value": 1344
+        },
+        "seed": {
+          "value": 0
+        },
+        "beta1": {
+          "value": 0.9
+        },
+        "beta2": {
+          "value": 0.95
+        },
+        "_wandb": {
+          "value": {
+            "m": [],
+            "t": {
+              "1": [
+                1
+              ],
+              "2": [
+                1
+              ],
+              "3": [
+                13,
+                16,
+                61
+              ],
+              "4": "3.12.15",
+              "5": "0.25.1",
+              "12": "0.25.1",
+              "13": "linux-x86_64"
+            },
+            "cli_version": "0.25.1",
+            "python_version": "3.12.15"
+          }
+        },
+        "device": {
+          "value": "cuda"
+        },
+        "max_lr": {
+          "value": 0.001
+        },
+        "min_lr": {
+          "value": 0.0001
+        },
+        "resume": {
+          "value": null
+        },
+        "d_model": {
+          "value": 512
+        },
+        "run_name": {
+          "value": "batch-2-lr-1e-3"
+        },
+        "grad_clip": {
+          "value": 1
+        },
+        "max_iters": {
+          "value": 640000
+        },
+        "num_heads": {
+          "value": 16
+        },
+        "stop_step": {
+          "value": null
+        },
+        "batch_size": {
+          "value": 2
+        },
+        "num_layers": {
+          "value": 4
+        },
+        "rope_theta": {
+          "value": 10000
+        },
+        "train_data": {
+          "value": "data/tokenized/tinystories_train.npy"
+        },
+        "valid_data": {
+          "value": "data/tokenized/tinystories_valid.npy"
+        },
+        "vocab_size": {
+          "value": 10000
+        },
+        "eval_batches": {
+          "value": 20
+        },
+        "log_interval": {
+          "value": 160
+        },
+        "wandb_entity": {
+          "value": "yangjuns-cmu-google"
+        },
+        "wandb_run_id": {
+          "value": null
+        },
+        "warmup_iters": {
+          "value": 3200
+        },
+        "weight_decay": {
+          "value": 0.1
+        },
+        "eval_interval": {
+          "value": 8000
+        },
+        "wandb_project": {
+          "value": "cs336-assignment1"
+        },
+        "checkpoint_dir": {
+          "value": "checkpoints/batch-2-lr-1e-3"
+        },
+        "context_length": {
+          "value": 256
+        },
+        "checkpoint_interval": {
+          "value": 8000
+        }
+      },
+      "summary": {
+        "_runtime": 3584.724213373,
+        "_step": 79200,
+        "_timestamp": 1793871303.216002,
+        "_wandb.runtime": 3584,
+        "elapsed_s": 3577.5205540657043,
+        "lr": 0.0009687393256474792,
+        "peak_gpu_mem_gb": 0.546860032,
+        "train_loss": 2.659446477890014,
+        "val_loss": 2.325670087337494
+      },
+      "last_step": 79200,
+      "history_file": "batch-2-lr-1e-3--3jil4aap.csv",
+      "history_rows": 495,
+      "url": "https://wandb.ai/yangjuns-cmu-google/cs336-assignment1/runs/3jil4aap"
+    },
+    {
+      "id": "j2hgt3wi",
+      "name": "batch-1-lr-1e-3",
+      "state": "killed",
+      "config": {
+        "eps": {
+          "value": 1e-08
+        },
+        "d_ff": {
+          "value": 1344
+        },
+        "seed": {
+          "value": 0
+        },
+        "beta1": {
+          "value": 0.9
+        },
+        "beta2": {
+          "value": 0.95
+        },
+        "_wandb": {
+          "value": {
+            "m": [],
+            "t": {
+              "1": [
+                1
+              ],
+              "2": [
+                1
+              ],
+              "3": [
+                13,
+                16,
+                61
+              ],
+              "4": "3.12.15",
+              "5": "0.25.1",
+              "12": "0.25.1",
+              "13": "linux-x86_64"
+            },
+            "cli_version": "0.25.1",
+            "python_version": "3.12.15"
+          }
+        },
+        "device": {
+          "value": "cuda"
+        },
+        "max_lr": {
+          "value": 0.001
+        },
+        "min_lr": {
+          "value": 0.0001
+        },
+        "resume": {
+          "value": null
+        },
+        "d_model": {
+          "value": 512
+        },
+        "run_name": {
+          "value": "batch-1-lr-1e-3"
+        },
+        "grad_clip": {
+          "value": 1
+        },
+        "max_iters": {
+          "value": 1280000
+        },
+        "num_heads": {
+          "value": 16
+        },
+        "stop_step": {
+          "value": null
+        },
+        "batch_size": {
+          "value": 1
+        },
+        "num_layers": {
+          "value": 4
+        },
+        "rope_theta": {
+          "value": 10000
+        },
+        "train_data": {
+          "value": "data/tokenized/tinystories_train.npy"
+        },
+        "valid_data": {
+          "value": "data/tokenized/tinystories_valid.npy"
+        },
+        "vocab_size": {
+          "value": 10000
+        },
+        "eval_batches": {
+          "value": 20
+        },
+        "log_interval": {
+          "value": 320
+        },
+        "wandb_entity": {
+          "value": "yangjuns-cmu-google"
+        },
+        "wandb_run_id": {
+          "value": null
+        },
+        "warmup_iters": {
+          "value": 6400
+        },
+        "weight_decay": {
+          "value": 0.1
+        },
+        "eval_interval": {
+          "value": 16000
+        },
+        "wandb_project": {
+          "value": "cs336-assignment1"
+        },
+        "checkpoint_dir": {
+          "value": "checkpoints/batch-1-lr-1e-3"
+        },
+        "context_length": {
+          "value": 256
+        },
+        "checkpoint_interval": {
+          "value": 160000
+        }
+      },
+      "summary": {
+        "_runtime": 24037.960971287,
+        "_step": 524480,
+        "_timestamp": 1793867444.5764756,
+        "_wandb.runtime": 24037,
+        "elapsed_s": 24036.60708141327,
+        "lr": 0.0006799066749595184,
+        "peak_gpu_mem_gb": 0.477887488,
+        "train_loss": 2.294230699539185,
+        "val_loss": 2.529567378759384
+      },
+      "last_step": 524480,
+      "history_file": "batch-1-lr-1e-3--j2hgt3wi.csv",
+      "history_rows": 1639,
+      "url": "https://wandb.ai/yangjuns-cmu-google/cs336-assignment1/runs/j2hgt3wi"
+    },
+    {
+      "id": "dymf17zq",
+      "name": "lr-3e-2",
+      "state": "finished",
+      "config": {
+        "eps": {
+          "value": 1e-08
+        },
+        "d_ff": {
+          "value": 1344
+        },
+        "seed": {
+          "value": 0
+        },
+        "beta1": {
+          "value": 0.9
+        },
+        "beta2": {
+          "value": 0.95
+        },
+        "_wandb": {
+          "value": {
+            "m": [],
+            "t": {
+              "1": [
+                1
+              ],
+              "2": [
+                1
+              ],
+              "3": [
+                2,
+                13,
+                16,
+                61
+              ],
+              "4": "3.12.15",
+              "5": "0.25.1",
+              "12": "0.25.1",
+              "13": "linux-x86_64"
+            },
+            "cli_version": "0.25.1",
+            "python_version": "3.12.15"
+          }
+        },
+        "device": {
+          "value": "cuda"
+        },
+        "max_lr": {
+          "value": 0.03
+        },
+        "min_lr": {
+          "value": 0.003
+        },
+        "resume": {
+          "value": null
+        },
+        "d_model": {
+          "value": 512
+        },
+        "run_name": {
+          "value": "lr-3e-2"
+        },
+        "grad_clip": {
+          "value": 1
+        },
+        "max_iters": {
+          "value": 40000
+        },
+        "num_heads": {
+          "value": 16
+        },
+        "stop_step": {
+          "value": null
+        },
+        "batch_size": {
+          "value": 32
+        },
+        "num_layers": {
+          "value": 4
+        },
+        "rope_theta": {
+          "value": 10000
+        },
+        "train_data": {
+          "value": "data/tokenized/tinystories_train.npy"
+        },
+        "valid_data": {
+          "value": "data/tokenized/tinystories_valid.npy"
+        },
+        "vocab_size": {
+          "value": 10000
+        },
+        "eval_batches": {
+          "value": 20
+        },
+        "log_interval": {
+          "value": 10
+        },
+        "wandb_entity": {
+          "value": "yangjuns-cmu-google"
+        },
+        "wandb_run_id": {
+          "value": null
+        },
+        "warmup_iters": {
+          "value": 200
+        },
+        "weight_decay": {
+          "value": 0.1
+        },
+        "eval_interval": {
+          "value": 500
+        },
+        "wandb_project": {
+          "value": "cs336-assignment1"
+        },
+        "checkpoint_dir": {
+          "value": "checkpoints/lr-3e-2"
+        },
+        "context_length": {
+          "value": 256
+        },
+        "checkpoint_interval": {
+          "value": 5000
+        }
+      },
+      "summary": {
+        "_runtime": 3239.007292895,
+        "_step": 40000,
+        "_timestamp": 1793841508.826684,
+        "_wandb.runtime": 3239,
+        "elapsed_s": 3237.9267041683197,
+        "lr": 0.0030000000420569114,
+        "peak_gpu_mem_gb": 4.296891392,
+        "train_loss": 1.7414870262145996,
+        "val_loss": 1.757015985250473
+      },
+      "last_step": 40000,
+      "history_file": "lr-3e-2--dymf17zq.csv",
+      "history_rows": 4000,
+      "url": "https://wandb.ai/yangjuns-cmu-google/cs336-assignment1/runs/dymf17zq"
+    },
+    {
+      "id": "jok4zzpi",
+      "name": "lr-1e-2",
+      "state": "finished",
+      "config": {
+        "eps": {
+          "value": 1e-08
+        },
+        "d_ff": {
+          "value": 1344
+        },
+        "seed": {
+          "value": 0
+        },
+        "beta1": {
+          "value": 0.9
+        },
+        "beta2": {
+          "value": 0.95
+        },
+        "_wandb": {
+          "value": {
+            "m": [],
+            "t": {
+              "1": [
+                1
+              ],
+              "2": [
+                1
+              ],
+              "3": [
+                2,
+                5,
+                13,
+                14,
+                16,
+                61,
+                62
+              ],
+              "4": "3.12.15",
+              "5": "0.25.1",
+              "12": "0.25.1",
+              "13": "linux-x86_64"
+            },
+            "cli_version": "0.25.1",
+            "python_version": "3.12.15"
+          }
+        },
+        "device": {
+          "value": "cuda"
+        },
+        "max_lr": {
+          "value": 0.01
+        },
+        "min_lr": {
+          "value": 0.001
+        },
+        "resume": {
+          "value": "checkpoints/lr-1e-2/latest.pt"
+        },
+        "d_model": {
+          "value": 512
+        },
+        "run_name": {
+          "value": "lr-1e-2"
+        },
+        "grad_clip": {
+          "value": 1
+        },
+        "max_iters": {
+          "value": 40000
+        },
+        "num_heads": {
+          "value": 16
+        },
+        "stop_step": {
+          "value": null
+        },
+        "batch_size": {
+          "value": 32
+        },
+        "num_layers": {
+          "value": 4
+        },
+        "rope_theta": {
+          "value": 10000
+        },
+        "train_data": {
+          "value": "data/tokenized/tinystories_train.npy"
+        },
+        "valid_data": {
+          "value": "data/tokenized/tinystories_valid.npy"
+        },
+        "vocab_size": {
+          "value": 10000
+        },
+        "eval_batches": {
+          "value": 20
+        },
+        "log_interval": {
+          "value": 10
+        },
+        "wandb_entity": {
+          "value": "yangjuns-cmu-google"
+        },
+        "wandb_run_id": {
+          "value": "jok4zzpi"
+        },
+        "warmup_iters": {
+          "value": 200
+        },
+        "weight_decay": {
+          "value": 0.1
+        },
+        "eval_interval": {
+          "value": 500
+        },
+        "wandb_project": {
+          "value": "cs336-assignment1"
+        },
+        "checkpoint_dir": {
+          "value": "checkpoints/lr-1e-2"
+        },
+        "context_length": {
+          "value": 256
+        },
+        "checkpoint_interval": {
+          "value": 5000
+        }
+      },
+      "summary": {
+        "_runtime": 3089.441797242,
+        "_step": 40000,
+        "_timestamp": 1793840744.6716712,
+        "_wandb.runtime": 386,
+        "elapsed_s": 2317.585325479507,
+        "lr": 0.0010000000140189705,
+        "peak_gpu_mem_gb": 4.297055232,
+        "train_loss": 1.5788849592208862,
+        "val_loss": 1.5758819222450255
+      },
+      "last_step": 40000,
+      "history_file": "lr-1e-2--jok4zzpi.csv",
+      "history_rows": 4000,
+      "url": "https://wandb.ai/yangjuns-cmu-google/cs336-assignment1/runs/jok4zzpi"
+    },
+    {
+      "id": "3ges9qr4",
+      "name": "lr-3e-3",
+      "state": "finished",
+      "config": {
+        "eps": {
+          "value": 1e-08
+        },
+        "d_ff": {
+          "value": 1344
+        },
+        "seed": {
+          "value": 0
+        },
+        "beta1": {
+          "value": 0.9
+        },
+        "beta2": {
+          "value": 0.95
+        },
+        "_wandb": {
+          "value": {
+            "m": [],
+            "t": {
+              "1": [
+                1
+              ],
+              "2": [
+                1
+              ],
+              "3": [
+                2,
+                13,
+                16,
+                61
+              ],
+              "4": "3.12.15",
+              "5": "0.25.1",
+              "12": "0.25.1",
+              "13": "linux-x86_64"
+            },
+            "cli_version": "0.25.1",
+            "python_version": "3.12.15"
+          }
+        },
+        "device": {
+          "value": "cuda"
+        },
+        "max_lr": {
+          "value": 0.003
+        },
+        "min_lr": {
+          "value": 0.0003
+        },
+        "resume": {
+          "value": null
+        },
+        "d_model": {
+          "value": 512
+        },
+        "run_name": {
+          "value": "lr-3e-3"
+        },
+        "grad_clip": {
+          "value": 1
+        },
+        "max_iters": {
+          "value": 40000
+        },
+        "num_heads": {
+          "value": 16
+        },
+        "batch_size": {
+          "value": 32
+        },
+        "num_layers": {
+          "value": 4
+        },
+        "rope_theta": {
+          "value": 10000
+        },
+        "train_data": {
+          "value": "data/tokenized/tinystories_train.npy"
+        },
+        "valid_data": {
+          "value": "data/tokenized/tinystories_valid.npy"
+        },
+        "vocab_size": {
+          "value": 10000
+        },
+        "cosine_iters": {
+          "value": null
+        },
+        "eval_batches": {
+          "value": 20
+        },
+        "log_interval": {
+          "value": 10
+        },
+        "wandb_entity": {
+          "value": "yangjuns-cmu-google"
+        },
+        "warmup_iters": {
+          "value": 200
+        },
+        "weight_decay": {
+          "value": 0.1
+        },
+        "eval_interval": {
+          "value": 500
+        },
+        "wandb_project": {
+          "value": "cs336-assignment1"
+        },
+        "checkpoint_dir": {
+          "value": "checkpoints/lr-3e-3"
+        },
+        "context_length": {
+          "value": 256
+        },
+        "checkpoint_interval": {
+          "value": 1000
+        }
+      },
+      "summary": {
+        "_runtime": 3071.515050586,
+        "_step": 40000,
+        "_timestamp": 1793778233.0600476,
+        "_wandb.runtime": 3071,
+        "elapsed_s": 3070.8316173553467,
+        "lr": 0.0003000000042056911,
+        "peak_gpu_mem_gb": 4.296891392,
+        "train_loss": 1.360999584197998,
+        "val_loss": 1.4025129318237304
+      },
+      "last_step": 40000,
+      "history_file": "lr-3e-3--3ges9qr4.csv",
+      "history_rows": 4000,
+      "url": "https://wandb.ai/yangjuns-cmu-google/cs336-assignment1/runs/3ges9qr4"
+    },
+    {
+      "id": "18z6f6q3",
+      "name": "lr-1e-3",
+      "state": "finished",
+      "config": {
+        "eps": {
+          "value": 1e-08
+        },
+        "d_ff": {
+          "value": 1344
+        },
+        "seed": {
+          "value": 0
+        },
+        "beta1": {
+          "value": 0.9
+        },
+        "beta2": {
+          "value": 0.95
+        },
+        "_wandb": {
+          "value": {
+            "m": [],
+            "t": {
+              "1": [
+                1
+              ],
+              "2": [
+                1
+              ],
+              "3": [
+                2,
+                13,
+                16,
+                61
+              ],
+              "4": "3.12.15",
+              "5": "0.25.1",
+              "12": "0.25.1",
+              "13": "linux-x86_64"
+            },
+            "cli_version": "0.25.1",
+            "python_version": "3.12.15"
+          }
+        },
+        "device": {
+          "value": "cuda"
+        },
+        "max_lr": {
+          "value": 0.001
+        },
+        "min_lr": {
+          "value": 0.0001
+        },
+        "resume": {
+          "value": null
+        },
+        "d_model": {
+          "value": 512
+        },
+        "run_name": {
+          "value": "lr-1e-3"
+        },
+        "grad_clip": {
+          "value": 1
+        },
+        "max_iters": {
+          "value": 40000
+        },
+        "num_heads": {
+          "value": 16
+        },
+        "batch_size": {
+          "value": 32
+        },
+        "num_layers": {
+          "value": 4
+        },
+        "rope_theta": {
+          "value": 10000
+        },
+        "train_data": {
+          "value": "data/tokenized/tinystories_train.npy"
+        },
+        "valid_data": {
+          "value": "data/tokenized/tinystories_valid.npy"
+        },
+        "vocab_size": {
+          "value": 10000
+        },
+        "cosine_iters": {
+          "value": null
+        },
+        "eval_batches": {
+          "value": 20
+        },
+        "log_interval": {
+          "value": 10
+        },
+        "wandb_entity": {
+          "value": "yangjuns-cmu-google"
+        },
+        "warmup_iters": {
+          "value": 200
+        },
+        "weight_decay": {
+          "value": 0.1
+        },
+        "eval_interval": {
+          "value": 500
+        },
+        "wandb_project": {
+          "value": "cs336-assignment1"
+        },
+        "checkpoint_dir": {
+          "value": "checkpoints/lr-1e-3"
+        },
+        "context_length": {
+          "value": 256
+        },
+        "checkpoint_interval": {
+          "value": 1000
+        }
+      },
+      "summary": {
+        "_runtime": 3071.727791469,
+        "_step": 40000,
+        "_timestamp": 1793775157.504624,
+        "_wandb.runtime": 3071,
+        "elapsed_s": 3071.043262720108,
+        "lr": 0.00010000000140189704,
+        "peak_gpu_mem_gb": 4.296891392,
+        "train_loss": 1.3322166204452517,
+        "val_loss": 1.3838209450244905
+      },
+      "last_step": 40000,
+      "history_file": "lr-1e-3--18z6f6q3.csv",
+      "history_rows": 4000,
+      "url": "https://wandb.ai/yangjuns-cmu-google/cs336-assignment1/runs/18z6f6q3"
+    },
+    {
+      "id": "09kcs5gv",
+      "name": "lr-3e-4",
+      "state": "finished",
+      "config": {
+        "eps": {
+          "value": 1e-08
+        },
+        "d_ff": {
+          "value": 1344
+        },
+        "seed": {
+          "value": 0
+        },
+        "beta1": {
+          "value": 0.9
+        },
+        "beta2": {
+          "value": 0.95
+        },
+        "_wandb": {
+          "value": {
+            "m": [],
+            "t": {
+              "1": [
+                1
+              ],
+              "2": [
+                1
+              ],
+              "3": [
+                2,
+                13,
+                16,
+                61
+              ],
+              "4": "3.12.15",
+              "5": "0.25.1",
+              "12": "0.25.1",
+              "13": "linux-x86_64"
+            },
+            "cli_version": "0.25.1",
+            "python_version": "3.12.15"
+          }
+        },
+        "device": {
+          "value": "cuda"
+        },
+        "max_lr": {
+          "value": 0.0003
+        },
+        "min_lr": {
+          "value": 3e-05
+        },
+        "resume": {
+          "value": null
+        },
+        "d_model": {
+          "value": 512
+        },
+        "run_name": {
+          "value": "lr-3e-4"
+        },
+        "grad_clip": {
+          "value": 1
+        },
+        "max_iters": {
+          "value": 40000
+        },
+        "num_heads": {
+          "value": 16
+        },
+        "batch_size": {
+          "value": 32
+        },
+        "num_layers": {
+          "value": 4
+        },
+        "rope_theta": {
+          "value": 10000
+        },
+        "train_data": {
+          "value": "data/tokenized/tinystories_train.npy"
+        },
+        "valid_data": {
+          "value": "data/tokenized/tinystories_valid.npy"
+        },
+        "vocab_size": {
+          "value": 10000
+        },
+        "cosine_iters": {
+          "value": null
+        },
+        "eval_batches": {
+          "value": 20
+        },
+        "log_interval": {
+          "value": 10
+        },
+        "wandb_entity": {
+          "value": "yangjuns-cmu-google"
+        },
+        "warmup_iters": {
+          "value": 200
+        },
+        "weight_decay": {
+          "value": 0.1
+        },
+        "eval_interval": {
+          "value": 500
+        },
+        "wandb_project": {
+          "value": "cs336-assignment1"
+        },
+        "checkpoint_dir": {
+          "value": "checkpoints/lr-3e-4"
+        },
+        "context_length": {
+          "value": 256
+        },
+        "checkpoint_interval": {
+          "value": 1000
+        }
+      },
+      "summary": {
+        "_runtime": 3073.12875032,
+        "_step": 40000,
+        "_timestamp": 1793772081.686315,
+        "_wandb.runtime": 3073,
+        "elapsed_s": 3072.4400000572205,
+        "lr": 3.0000000420569115e-05,
+        "peak_gpu_mem_gb": 4.296891392,
+        "train_loss": 1.408455729484558,
+        "val_loss": 1.446088397502899
+      },
+      "last_step": 40000,
+      "history_file": "lr-3e-4--09kcs5gv.csv",
+      "history_rows": 4000,
+      "url": "https://wandb.ai/yangjuns-cmu-google/cs336-assignment1/runs/09kcs5gv"
+    }
+  ]
+}
