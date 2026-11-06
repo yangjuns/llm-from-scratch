@@ -53,4 +53,5 @@ Write-ups of what I measured and learned along the way. Naming: `aN-<topic>.md` 
 | A1 | [LLM experiments](notes/a1-llm-experiments.md) | Training experiments. |
 | A1 | [Learning-rate sweep](notes/a1-learning-rate-sweep.md) | Compare five learning-rate schedules on TinyStories using full training and validation histories. |
 | A1 | [Batch-size sweep](notes/a1-batch-size-sweep.md) | Compare batch sizes by token budget, runtime, utilization, and memory. |
+| A1 | [Ablation experiments](notes/a1-ablation-experiments.md) | Compare ablations, starting with no-RMSNorm runs against an existing baseline. |
 | General | [Tensor operations](notes/tensor-operations.md) | Track shapes, not values: indexing, broadcasting, einsum, stack/cat, rearrange, and masking |
