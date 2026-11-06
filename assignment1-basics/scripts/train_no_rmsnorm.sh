@@ -17,7 +17,7 @@ for settings in "1e-3 1e-4" "1e-4 1e-5"; do
         --valid-data data/tokenized/tinystories_valid.npy \
         --no-rmsnorm \
         --seed 0 \
-        --batch-size 32 \
+        --batch-size 64 \
         --max-iters "$max_iters" \
         --max-lr "$max_lr" \
         --min-lr "$min_lr" \
