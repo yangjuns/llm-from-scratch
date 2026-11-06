@@ -61,3 +61,27 @@ The arrays are saved under `data/tokenized/` as `tinystories_train.npy`,
 `tinystories_valid.npy`, `owt_train.npy`, and `owt_valid.npy`. They can be
 loaded without reading the full arrays into memory using
 `np.load(path, mmap_mode="r")`.
+
+### No positional encoding experiment
+
+Pass `--nope` to training to disable RoPE in every transformer layer. The
+causal attention mask remains enabled. RMSNorm remains enabled unless
+`--no-rmsnorm` is also specified. For example:
+
+```sh
+uv run python -m cs336_basics.train \
+  --train-data data/tokenized/tinystories_train.npy \
+  --valid-data data/tokenized/tinystories_valid.npy \
+  --batch-size 64 --max-lr 1e-3 --min-lr 1e-4 \
+  --nope --checkpoint-dir checkpoints/nope-lr-1e-3
+```
+
+RoPE is enabled by default, and `--rope-theta` has no effect with `--nope`.
+RoPE and NoPE checkpoints have the same weight keys, so loading a checkpoint
+does not identify which mode was used. Always pass `--nope` when resuming a
+NoPE training run and set `NOPE=1` when generating from a NoPE checkpoint:
+
+```sh
+NOPE=1 CHECKPOINT=checkpoints/nope-lr-1e-3/latest.pt \
+  bash scripts/generate_sample.sh
+```

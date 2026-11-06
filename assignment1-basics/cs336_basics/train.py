@@ -30,6 +30,11 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--d-ff", type=int, default=1344)
     p.add_argument("--rope-theta", type=float, default=10_000.0)
     p.add_argument(
+        "--nope",
+        action="store_true",
+        help="Disable RoPE (no explicit positional encoding)",
+    )
+    p.add_argument(
         "--no-rmsnorm",
         action="store_true",
         help="Ablation: replace all RMSNorm layers with identity",
@@ -125,6 +130,7 @@ def main() -> None:
         rope_theta=args.rope_theta,
         device=torch.device(args.device),
         use_rmsnorm=not args.no_rmsnorm,
+        enable_rope=not args.nope,
     )
     optimizer = AdamW(
         list(model.parameters()),
