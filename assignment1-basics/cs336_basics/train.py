@@ -69,7 +69,7 @@ def parse_args() -> argparse.Namespace:
         "--stop-step",
         type=int,
         default=None,
-        help="Stop (and checkpoint) at this step (default: --max-iters); "
+        help="Stop at this step (default: --max-iters); "
         "the LR schedule is unaffected",
     )
     p.add_argument("--log-interval", type=int, default=10)
@@ -78,6 +78,11 @@ def parse_args() -> argparse.Namespace:
     # Checkpointing
     p.add_argument("--checkpoint-dir", type=Path, default=Path("checkpoints"))
     p.add_argument("--checkpoint-interval", type=int, default=5000)
+    p.add_argument(
+        "--no-checkpoint",
+        action="store_true",
+        help="Disable all checkpoint writes, including the final checkpoint",
+    )
     p.add_argument(
         "--resume",
         type=Path,
@@ -204,7 +209,8 @@ def main() -> None:
             config=vars(args),
         )
 
-    args.checkpoint_dir.mkdir(parents=True, exist_ok=True)
+    if not args.no_checkpoint:
+        args.checkpoint_dir.mkdir(parents=True, exist_ok=True)
     # LR schedule always spans --max-iters, regardless of --stop-step.
     # gradiant_clip iterates its argument twice, so it needs a list.
     params = list(model.parameters())
@@ -262,7 +268,9 @@ def main() -> None:
             print(f"step {step} | val loss {val_loss:.4f}", flush=True)
         if use_wandb and metrics:
             wandb.log(metrics, step=step)
-        if step % args.checkpoint_interval == 0 or step == end_iter:
+        if not args.no_checkpoint and (
+            step % args.checkpoint_interval == 0 or step == end_iter
+        ):
             numbered = args.checkpoint_dir / f"step_{step:06d}.pt"
             save_checkpoint(model, optimizer, step, numbered)
             shutil.copyfile(numbered, args.checkpoint_dir / "latest.pt")

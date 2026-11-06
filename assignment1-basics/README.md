@@ -89,6 +89,10 @@ micro-batches. Evaluation still uses `--batch-size` sequences per evaluation
 batch. Checkpoints do not store the accumulation setting; pass the intended
 settings explicitly when resuming.
 
+For memory or throughput pilots, pass `--no-checkpoint` to disable both
+periodic and final checkpoint writes. No training progress from such a run
+can be resumed unless it was saved separately.
+
 ### No positional encoding experiment
 
 Pass `--nope` to training to disable RoPE in every transformer layer. The

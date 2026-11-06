@@ -212,7 +212,8 @@ headroom. If 8 runs out of memory, try 4 with 16 accumulation steps. Compare
 throughput as well as memory. The training log's peak is PyTorch-allocated
 memory in decimal GB, not reserved or total device memory; inspect device
 usage separately. A short pilot exercises several full forward, backward, and
-optimizer steps, plus a final evaluation and checkpoint.
+optimizer steps, plus a final evaluation. Pass `--no-checkpoint` if no
+checkpoint is needed and disk space is limited.
 
 ### Initial 4090 pilot
 
