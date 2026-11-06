@@ -333,6 +333,7 @@ class TransformerBlock(torch.nn.Module):
         theta: float,
         device: torch.device | None = None,
         dtype: torch.dtype | None = None,
+        use_rmsnorm: bool = True,
     ):
         super().__init__()
         self.d_model = d_model
@@ -341,7 +342,11 @@ class TransformerBlock(torch.nn.Module):
         self.max_seq_len = max_seq_len
         self.theta = theta
         # Block components
-        self.norm1 = RMSNorm(d_model, device=device, dtype=dtype)
+        self.norm1 = (
+            RMSNorm(d_model, device=device, dtype=dtype)
+            if use_rmsnorm
+            else torch.nn.Identity()
+        )
         self.attention = MultiHeadSelfAttention(
             d_model,
             num_heads,
@@ -351,7 +356,11 @@ class TransformerBlock(torch.nn.Module):
             device,
             dtype,
         )
-        self.norm2 = RMSNorm(d_model, device=device, dtype=dtype)
+        self.norm2 = (
+            RMSNorm(d_model, device=device, dtype=dtype)
+            if use_rmsnorm
+            else torch.nn.Identity()
+        )
         self.feed_forward = SwiGLUFF(d_model, d_ff, device, dtype)
 
     def forward(
@@ -383,6 +392,7 @@ class TransformerLM(torch.nn.Module):
         rope_theta: float,
         device: torch.device | None = None,
         dtype: torch.dtype | None = None,
+        use_rmsnorm: bool = True,
     ):
         super().__init__()
         self.vocab_size = vocab_size
@@ -405,6 +415,7 @@ class TransformerLM(torch.nn.Module):
                     rope_theta,
                     device=device,
                     dtype=dtype,
+                    use_rmsnorm=use_rmsnorm,
                 )
                 for _ in range(num_layers)
             ]
@@ -412,7 +423,11 @@ class TransformerLM(torch.nn.Module):
         self.token_embeddings = torch.nn.Embedding(
             vocab_size, d_model, device=device, dtype=dtype
         )
-        self.ln_final = RMSNorm(d_model, device=device, dtype=dtype)
+        self.ln_final = (
+            RMSNorm(d_model, device=device, dtype=dtype)
+            if use_rmsnorm
+            else torch.nn.Identity()
+        )
         self.lm_head = Linear(d_model, vocab_size, device=device, dtype=dtype)
 
     def forward(
