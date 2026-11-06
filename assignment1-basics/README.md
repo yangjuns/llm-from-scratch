@@ -62,6 +62,33 @@ The arrays are saved under `data/tokenized/` as `tinystories_train.npy`,
 loaded without reading the full arrays into memory using
 `np.load(path, mmap_mode="r")`.
 
+### Training precision
+
+Training and evaluation default to FP32. Pass `--dtype bfloat16` to use
+BF16 autocast for eligible forward operations on CPU or a CUDA device with
+native BF16 support, such as an RTX 4090. Parameters, gradients, AdamW state,
+and the cross-entropy calculation remain FP32. BF16 does not halve total
+training memory, and the feasible batch size must be measured.
+
+For example, add `--dtype bfloat16` to a training command. Use the same option
+when resuming a BF16 run: checkpoints store the model and optimizer, but not
+the requested training precision.
+
+### Gradient accumulation
+
+`--batch-size` sets the number of sequences in each physical micro-batch.
+Use `--gradient-accumulation-steps` to average gradients over multiple
+micro-batches before clipping and updating the model. The default is 1,
+which preserves the original one-batch-per-update behavior. For example,
+`--batch-size 4 --gradient-accumulation-steps 16` gives an effective batch of
+64 sequences; with `--context-length 1024`, that is 65,536 tokens per update.
+
+Training loss is the mean across the micro-batches. Learning-rate scheduling,
+logging, evaluation, and checkpoint intervals count optimizer updates, not
+micro-batches. Evaluation still uses `--batch-size` sequences per evaluation
+batch. Checkpoints do not store the accumulation setting; pass the intended
+settings explicitly when resuming.
+
 ### No positional encoding experiment
 
 Pass `--nope` to training to disable RoPE in every transformer layer. The

@@ -51,6 +51,7 @@ Write-ups of what I measured and learned along the way. Naming: `aN-<topic>.md` 
 | A1 | [BPE: TinyStories vs OpenWebText](notes/a1-bpe-tinystories-vs-owt.md) | Vocab reflects corpus: clean data gives word-like tokens, noisy web data wastes slots on junk runs and mojibake |
 | A1 | [LLM implementation](notes/a1-llm-implementation.md) | RMSNorm, linear (no bias), SwiGLU, RoPE, and numerical precision: matmuls can use low precision, but positions, norms, softmax, and optimizer state need float32 |
 | A1 | [LLM experiments](notes/a1-llm-experiments.md) | Training experiments. |
+| A1 | [OpenWebText on one 4090](notes/a1-owt-4090-training.md) | Record context-length and mixed-precision decisions, with proposed measurements for model selection. |
 | A1 | [Learning-rate sweep](notes/a1-learning-rate-sweep.md) | Compare five learning-rate schedules on TinyStories using full training and validation histories. |
 | A1 | [Batch-size sweep](notes/a1-batch-size-sweep.md) | Compare batch sizes by token budget, runtime, utilization, and memory. |
 | A1 | [Ablation experiments](notes/a1-ablation-experiments.md) | Compare ablations, starting with no-RMSNorm runs against an existing baseline. |
