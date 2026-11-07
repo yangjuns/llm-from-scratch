@@ -5,7 +5,7 @@
 Find a good OpenWebText language model that can be trained on one 24 GB
 RTX 4090. "Best" depends on the available training time and token budget,
 not just the largest model that fits in memory. This note records decisions
-and proposals; it does not report a completed OpenWebText training run.
+and short memory pilots, not a completed full OpenWebText training run.
 
 The TinyStories baseline used 22.7M parameters, a 256-token context, batch
 size 64, FP32, and a peak learning rate of `1e-3`. Its results are described
@@ -101,12 +101,100 @@ custom cross-entropy. More detail on precision is in the
 Before a full run, compare FP32 and BF16 on a small fixed batch: check finite
 loss and gradients, compare losses and updates within reasonable tolerances,
 and measure peak allocated and reserved GPU memory, tokens per second, and
-validation loss. A successful short test is not proof of long-run stability.
-The 4090 fit and speedup have not yet been measured for this configuration.
+validation loss. A successful short test is not proof of long-run stability
+or a measurement of BF16 speedup over FP32.
 
-## Model size and experiments still to decide
+## Decision 3: model shape and training budget
 
-A **candidate**, not a proven optimum, is 12 layers, width 768, 12 heads,
+We compared short BF16 pilots at context 1,024 on the 4090. Reported memory
+figures below are the user's observed PyTorch peak allocated memory in decimal
+GB, not reserved or total device memory. Pilot results are not validation-loss
+comparisons, and the reported training peak may not include final evaluation.
+
+| Layers | Width | Heads | `d_ff` | Parameters | Physical batch | Peak allocated |
+|---:|---:|---:|---:|---:|---:|---:|
+| 12 | 768 | 12 | 2,048 | 134,105,856 | 8 | 18.60 GB |
+| 12 | 768 | 12 | 2,048 | 134,105,856 | 16 | Out of memory |
+| 16 | 768 | 12 | 2,048 | 162,423,552 | 8 | 23.11 GB |
+| 12 | 864 | 12 | 2,304 | 162,813,024 | 8 | 19.72 GB |
+| 12 | 960 | 12 | 2,560 | 194,174,400 | 8 | 20.84 GB |
+| **12** | **1,056** | **12** | **2,816** | **228,189,984** | **8** | **about 22 GB** |
+
+The 16-layer and 864-wide models have nearly the same parameter count, but
+the wider pilot used less peak allocated memory. We then tested wider
+12-layer models while keeping 12 heads and the `8/3` SwiGLU width. We chose
+**12 layers and width 1,056** as a practical candidate that fit the short
+pilot, not as a demonstrated optimum. Compare validation loss at matched
+token and time budgets before claiming it is better than another shape.
+
+[CS336 lecture 3](https://github.com/stanford-cs336/lectures/blob/main/lecture_03.pdf)
+defines aspect ratio as `d_model / num_layers` and summarizes roughly 100-200
+as a wide range of reasonable values, subject to systems considerations.
+The chosen model has aspect ratio 88; this heuristic comes from other models
+and is not a requirement. Its 88-dimensional heads are even for RoPE.
+Width 1,056 is divisible by 32, and its feed-forward width 2,816 by 128;
+dimensions need not be powers of two, but actual throughput must be measured.
+
+The chosen full-run plan is BF16 autocast, a micro-batch of 8 and 8
+accumulation steps, yielding 65,536 tokens per optimizer update.
+The 70,000-update schedule processes **4,587,520,000 sampled tokens**,
+about 20.1 times the model's parameter count and 1.68 times the tokenized
+training-array size. Twenty tokens per parameter is a planning heuristic,
+not a requirement; random window sampling does not guarantee complete
+coverage. At the observed approximately 3 seconds per update, training
+takes roughly 58 hours 20 minutes, excluding evaluation, checkpoints,
+startup, and interruptions. Peak learning rate `1e-3` remains a candidate
+based on TinyStories rather than a verified OpenWebText optimum.
+
+For a long run, checkpoint space must be planned before starting. The
+current script saves a numbered checkpoint and a separate `latest.pt` copy;
+it retains numbered checkpoints. For 228M FP32 parameters and two FP32 Adam
+moments, one checkpoint is roughly 2.74 GB before serialization overhead,
+and each new numbered checkpoint plus latest copy needs roughly 5.48 GB
+initially; additional numbered checkpoints add roughly 2.74 GB each.
+`--no-checkpoint` avoids those writes but produces no saved model and offers
+no resume after interruption. Check available disk or a mounted volume first.
+
+### Full-run command
+
+The selected plan saves every 5,000 updates and logs to the existing W&B
+project. With 70,000 updates, 14 numbered checkpoints plus `latest.pt` will
+occupy roughly 41 GB in total, before serialization overhead and other
+files; W&B metric logging alone does not save the model. Confirm enough disk
+space before starting or point `--checkpoint-dir` at a suitable volume.
+Authenticate W&B on the VM before launching; do not put credentials in the
+command or notes.
+
+From `assignment1-basics/`:
+
+```sh
+uv run python -m cs336_basics.train \
+  --train-data data/tokenized/owt_train.npy \
+  --valid-data data/tokenized/owt_valid.npy \
+  --device cuda --dtype bfloat16 \
+  --vocab-size 32000 --context-length 1024 \
+  --d-model 1056 --num-layers 12 --num-heads 12 --d-ff 2816 \
+  --batch-size 8 --gradient-accumulation-steps 8 \
+  --max-lr 1e-3 --min-lr 1e-4 --warmup-iters 200 \
+  --max-iters 70000 --log-interval 10 \
+  --eval-interval 250 --eval-batches 20 \
+  --checkpoint-interval 5000 \
+  --checkpoint-dir checkpoints/owt-228m-bf16 \
+  --wandb-project cs336-assignment1 \
+  --wandb-entity yangjuns-cmu-google \
+  --run-name owt-228m-bf16
+```
+
+This command has not yet been run as a full training job. It uses the
+trainer's defaults for AdamW betas, epsilon, weight decay, gradient clipping,
+RoPE, RMSNorm, and seed, as listed in the earlier training table. To resume,
+keep the same model, optimizer and schedule arguments, add `--resume` with
+the checkpoint path, and use the W&B run ID with `--wandb-run-id` if resuming
+the same run. Checkpoint resume does not restore random generator states.
+
+## Initial 134M candidate and memory estimates
+
+The initial candidate was 12 layers, width 768, 12 heads,
 feed-forward width 2,048, and the 32,000-token OpenWebText vocabulary. With
 the current separate input embeddings and output head, this is **134,105,856
 parameters**. The tokenized training set has 2,727,120,453 tokens, roughly
@@ -140,7 +228,7 @@ learned parameters to this RoPE architecture.
 | Hyperparameter | Initial value | Status |
 |---|---:|---|
 | Precision | BF16 autocast | Candidate; parameters and optimizer state stay FP32 |
-| Physical micro-batch | 8 sequences | Unverified on the 4090 |
+| Physical micro-batch | 8 sequences | Initial pilot configuration |
 | Gradient accumulation | 8 micro-batches | Effective batch of 64 sequences |
 | Tokens per optimizer update | 65,536 | `8 * 8 * 1024` |
 | Optimizer | AdamW | Existing implementation |
@@ -242,7 +330,7 @@ use the same configuration and schedule, remove `--stop-step 10`, and add
 training arguments or random generator states; resuming does not reproduce an
 uninterrupted run's exact sample sequence.
 
-Next steps:
+Initial-pilot next steps (superseded by the chosen candidate above):
 
 1. Measure the candidate on the 4090 at context 1,024, starting with
    micro-batch 8. Include the optimizer step in peak-memory measurements.
