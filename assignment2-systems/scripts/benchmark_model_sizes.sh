@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+WARMUP_STEPS="${1:-5}"
+if [[ $# -gt 1 || ! "$WARMUP_STEPS" =~ ^[0-9]+$ ]]; then
+    printf 'Usage: %s [nonnegative-warmup-steps]\n' "$0" >&2
+    exit 1
+fi
+
 PROJECT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$PROJECT_DIR"
 
@@ -34,7 +40,7 @@ for config in "${configs[@]}"; do
                 --num-layers "$num_layers" \
                 --num-heads "$num_heads" \
                 --batch-size 4 \
-                --warmup-steps 5 \
+                --warmup-steps "$WARMUP_STEPS" \
                 --steps 10 \
                 --mode "$mode" \
                 --device cuda

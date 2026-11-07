@@ -18,6 +18,13 @@ def positive_int(value: str) -> int:
     return result
 
 
+def nonnegative_int(value: str) -> int:
+    result = int(value)
+    if result < 0:
+        raise argparse.ArgumentTypeError("must be a nonnegative integer")
+    return result
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Initialize a Transformer model for benchmarking."
@@ -30,7 +37,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--d-ff", type=positive_int, default=1344)
     parser.add_argument("--rope-theta", type=float, default=10_000.0)
     parser.add_argument("--batch-size", type=positive_int, default=32)
-    parser.add_argument("--warmup-steps", type=positive_int, default=10)
+    parser.add_argument("--warmup-steps", type=nonnegative_int, default=10)
     parser.add_argument("--steps", type=positive_int, default=100)
     parser.add_argument(
         "--mode",
