@@ -1,4 +1,5 @@
 import argparse
+import statistics
 import timeit
 from typing import cast
 
@@ -72,6 +73,10 @@ def main() -> None:
         f"Initialized {num_params:,} parameters on {args.device} with batch "
         f"size {args.batch_size}"
     )
+    device = next(model.parameters()).device
+    print(f"Running on CUDA: {device.type == 'cuda'}")
+    if device.type == "cuda":
+        print(f"GPU: {torch.cuda.get_device_name(device)}")
     # Generate random batch of data (batch_size, seq)
     x: torch.Tensor = torch.randint(
         0,
@@ -100,8 +105,13 @@ def main() -> None:
         step()
 
     # Run timed steps
-    elapsed = timeit.timeit(lambda: step(), number=args.steps)
+    timings = timeit.repeat(step, number=1, repeat=args.steps)
+    elapsed = sum(timings)
     print(f"Completed {args.steps} steps in {elapsed:.9f}s")
+    print(
+        f"Mean: {statistics.mean(timings):.9f}s/step, "
+        f"Std (population): {statistics.pstdev(timings):.9f}s/step"
+    )
 
 
 if __name__ == "__main__":

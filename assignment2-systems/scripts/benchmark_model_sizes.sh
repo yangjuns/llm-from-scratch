@@ -5,7 +5,8 @@ PROJECT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$PROJECT_DIR"
 
 mkdir -p results
-LOG_FILE="results/benchmark_model_sizes_$(date +%Y%m%d_%H%M%S).log"
+LOG_FILE="results/benchmark_model_sizes.log"
+: > "$LOG_FILE"
 
 configs=(
     "small 768 3072 12 12"
