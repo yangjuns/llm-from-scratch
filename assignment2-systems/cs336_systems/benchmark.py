@@ -96,15 +96,21 @@ def main() -> None:
     def step():
         # check the mode
         if args.mode == "forward":
-            model(x)
+            with torch.cuda.nvtx.range("forward"):
+                model(x)
         elif args.mode == "forward-backward":
-            y = model(x)
-            y.sum().backward()
+            with torch.cuda.nvtx.range("forward"):
+                y = model(x)
+            with torch.cuda.nvtx.range("backward"):
+                y.sum().backward()
         elif args.mode == "forward-backward-optimizer":
-            y = model(x)
+            with torch.cuda.nvtx.range("forward"):
+                y = model(x)
             optimizer.zero_grad()
-            y.sum().backward()
-            optimizer.step()
+            with torch.cuda.nvtx.range("backward"):
+                y.sum().backward()
+            with torch.cuda.nvtx.range("optimizer"):
+                optimizer.step()
         torch.cuda.synchronize() if args.device == "cuda" else None
 
     # Run w steps of warm up
