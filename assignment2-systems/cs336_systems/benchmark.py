@@ -118,7 +118,8 @@ def main() -> None:
         step()
 
     # Run timed steps
-    timings = timeit.repeat(step, number=1, repeat=args.steps)
+    with torch.cuda.nvtx.range("measurement"):
+        timings = timeit.repeat(step, number=1, repeat=args.steps)
     elapsed = sum(timings)
     print(f"Completed {args.steps} steps in {elapsed:.9f}s")
     print(
