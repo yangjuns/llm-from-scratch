@@ -424,14 +424,22 @@ def scaled_dot_product_attention(
     """
 
     d_k = K.shape[-1]
-    attention_scores = einsum(Q, K, "... query d_k, ... key d_k -> ... query key") / math.sqrt(d_k)
+    with torch.cuda.nvtx.range("attention_qk_matmul"):
+        attention_scores = einsum(
+            Q, K, "... query d_k, ... key d_k -> ... query key"
+        )
+    attention_scores = attention_scores / math.sqrt(d_k)
 
     if mask is not None:
         attention_scores = torch.where(mask, attention_scores, float("-inf"))
 
-    attention_weights = softmax(attention_scores, dim=-1)  # Softmax over the key dimension
+    with torch.cuda.nvtx.range("attention_softmax"):
+        attention_weights = softmax(attention_scores, dim=-1)
 
-    return einsum(attention_weights, V, "... query key, ... key d_v ->  ... query d_v")
+    with torch.cuda.nvtx.range("attention_av_matmul"):
+        return einsum(
+            attention_weights, V, "... query key, ... key d_v ->  ... query d_v"
+        )
 
 
 class CausalMultiHeadSelfAttention(nn.Module):
