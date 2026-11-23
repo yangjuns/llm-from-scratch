@@ -2,6 +2,7 @@ import argparse
 import statistics
 import timeit
 from contextlib import nullcontext
+from pathlib import Path
 from typing import cast
 
 import torch
@@ -52,6 +53,12 @@ def parse_args() -> argparse.Namespace:
         help="run the model forward pass with BF16 autocast",
     )
     parser.add_argument(
+        "--memory-profile",
+        type=Path,
+        metavar="PATH",
+        help="record CUDA memory history and write a snapshot pickle to PATH",
+    )
+    parser.add_argument(
         "--device", default="cuda" if torch.cuda.is_available() else "cpu"
     )
     args = parser.parse_args()
@@ -61,6 +68,8 @@ def parse_args() -> argparse.Namespace:
         parser.error("--d-model / --num-heads must be even for RoPE")
     if not 0 < args.rope_theta < float("inf"):
         parser.error("--rope-theta must be finite and positive")
+    if args.memory_profile is not None and not args.device.startswith("cuda"):
+        parser.error("--memory-profile requires --device cuda")
     return args
 
 
@@ -132,9 +141,21 @@ def main() -> None:
     for _ in range(args.warmup_steps):
         step()
 
+    if args.memory_profile is not None:
+        args.memory_profile.parent.mkdir(parents=True, exist_ok=True)
+        torch.cuda.memory._record_memory_history(max_entries=1_000_000)
+
     # Run timed steps
-    with torch.cuda.nvtx.range("measurement"):
-        timings = timeit.repeat(step, number=1, repeat=args.steps)
+    try:
+        with torch.cuda.nvtx.range("measurement"):
+            timings = timeit.repeat(step, number=1, repeat=args.steps)
+    finally:
+        if args.memory_profile is not None:
+            try:
+                torch.cuda.memory._dump_snapshot(str(args.memory_profile))
+            finally:
+                torch.cuda.memory._record_memory_history(enabled=None)
+
     elapsed = sum(timings)
     print(f"Completed {args.steps} steps in {elapsed:.9f}s")
     print(
