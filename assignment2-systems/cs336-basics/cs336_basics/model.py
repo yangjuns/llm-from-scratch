@@ -378,14 +378,22 @@ class TransformerBlock(nn.Module):
         """
         # NOTE: this is a pre-norm Transformer, and differs from the original
         # description in the paper.
-        # Apply the multi-head self-attention sublayer
-        x_attn = self.attn(self.ln1(x))
-        attn_sublayer_output = x + x_attn
+        with torch.cuda.nvtx.range("transformer_block"):
+            # Apply the multi-head self-attention sublayer
+            with torch.cuda.nvtx.range("attention_rmsnorm"):
+                normalized_x = self.ln1(x)
+            with torch.cuda.nvtx.range("self_attention"):
+                x_attn = self.attn(normalized_x)
+            with torch.cuda.nvtx.range("attention_residual"):
+                attn_sublayer_output = x + x_attn
 
-        # Apply the feed-forward sublayer
-        x_ffn = self.ffn(self.ln2(attn_sublayer_output))
-        ffn_sublayer_output = attn_sublayer_output + x_ffn
-        return ffn_sublayer_output
+            # Apply the feed-forward sublayer
+            with torch.cuda.nvtx.range("ffn_rmsnorm"):
+                normalized_attn = self.ln2(attn_sublayer_output)
+            with torch.cuda.nvtx.range("swiglu"):
+                x_ffn = self.ffn(normalized_attn)
+            with torch.cuda.nvtx.range("ffn_residual"):
+                return attn_sublayer_output + x_ffn
 
 
 class SwiGLU(nn.Module):
@@ -396,7 +404,16 @@ class SwiGLU(nn.Module):
         self.w3 = Linear(d_model, d_ff)
 
     def forward(self, x):
-        return self.w2(silu(self.w1(x)) * self.w3(x))
+        with torch.cuda.nvtx.range("swiglu_w1"):
+            w1_output = self.w1(x)
+        with torch.cuda.nvtx.range("swiglu_w3"):
+            w3_output = self.w3(x)
+        with torch.cuda.nvtx.range("swiglu_silu"):
+            activated_w1 = silu(w1_output)
+        with torch.cuda.nvtx.range("swiglu_elementwise_mul"):
+            hidden = activated_w1 * w3_output
+        with torch.cuda.nvtx.range("swiglu_w2"):
+            return self.w2(hidden)
 
 
 def scaled_dot_product_attention(
@@ -425,9 +442,7 @@ def scaled_dot_product_attention(
 
     d_k = K.shape[-1]
     with torch.cuda.nvtx.range("attention_qk_matmul"):
-        attention_scores = einsum(
-            Q, K, "... query d_k, ... key d_k -> ... query key"
-        )
+        attention_scores = einsum(Q, K, "... query d_k, ... key d_k -> ... query key")
     attention_scores = attention_scores / math.sqrt(d_k)
 
     if mask is not None:
@@ -437,9 +452,7 @@ def scaled_dot_product_attention(
         attention_weights = softmax(attention_scores, dim=-1)
 
     with torch.cuda.nvtx.range("attention_av_matmul"):
-        return einsum(
-            attention_weights, V, "... query key, ... key d_v ->  ... query d_v"
-        )
+        return einsum(attention_weights, V, "... query key, ... key d_v ->  ... query d_v")
 
 
 class CausalMultiHeadSelfAttention(nn.Module):
