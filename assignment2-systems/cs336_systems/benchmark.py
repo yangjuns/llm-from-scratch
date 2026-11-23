@@ -1,6 +1,7 @@
 import argparse
 import statistics
 import timeit
+from contextlib import nullcontext
 from typing import cast
 
 import torch
@@ -46,6 +47,11 @@ def parse_args() -> argparse.Namespace:
         help="steps to time: forward, forward-backward, or forward-backward-optimizer",
     )
     parser.add_argument(
+        "--mixed-precision",
+        action="store_true",
+        help="run the model forward pass with BF16 autocast",
+    )
+    parser.add_argument(
         "--device", default="cuda" if torch.cuda.is_available() else "cpu"
     )
     args = parser.parse_args()
@@ -82,6 +88,7 @@ def main() -> None:
     )
     device = next(model.parameters()).device
     print(f"Running on CUDA: {device.type == 'cuda'}")
+    print(f"Precision: {'BF16 autocast' if args.mixed_precision else 'FP32'}")
     if device.type == "cuda":
         print(f"GPU: {torch.cuda.get_device_name(device)}")
     # Generate random batch of data (batch_size, seq)
@@ -93,19 +100,27 @@ def main() -> None:
     )
 
     # Define each step as a lambda for timing
-    def step():
+    def step() -> None:
+        autocast_context = (
+            torch.autocast(device_type=device.type, dtype=torch.bfloat16)
+            if args.mixed_precision
+            else nullcontext()
+        )
         # check the mode
         if args.mode == "forward":
             with torch.cuda.nvtx.range("forward"):
-                model(x)
+                with autocast_context:
+                    model(x)
         elif args.mode == "forward-backward":
             with torch.cuda.nvtx.range("forward"):
-                y = model(x)
+                with autocast_context:
+                    y = model(x)
             with torch.cuda.nvtx.range("backward"):
                 y.sum().backward()
         elif args.mode == "forward-backward-optimizer":
             with torch.cuda.nvtx.range("forward"):
-                y = model(x)
+                with autocast_context:
+                    y = model(x)
             optimizer.zero_grad()
             with torch.cuda.nvtx.range("backward"):
                 y.sum().backward()
