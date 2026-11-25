@@ -53,6 +53,11 @@ def parse_args() -> argparse.Namespace:
         help="run the model forward pass with BF16 autocast",
     )
     parser.add_argument(
+        "--compile",
+        action="store_true",
+        help="compile the Transformer with torch.compile",
+    )
+    parser.add_argument(
         "--memory-profile",
         type=Path,
         metavar="PATH",
@@ -88,6 +93,9 @@ def main() -> None:
             rope_theta=args.rope_theta,
         ),
     ).to(args.device)
+    if args.compile:
+        model = torch.compile(model, fullgraph=True)
+
     # Initialize optimizer
     optimizer = cast(torch.optim.Optimizer, AdamW(model.parameters()))
     num_params = sum(parameter.numel() for parameter in model.parameters())
@@ -98,6 +106,7 @@ def main() -> None:
     device = next(model.parameters()).device
     print(f"Running on CUDA: {device.type == 'cuda'}")
     print(f"Precision: {'BF16 autocast' if args.mixed_precision else 'FP32'}")
+    print(f"Compiled: {args.compile}")
     if device.type == "cuda":
         print(f"GPU: {torch.cuda.get_device_name(device)}")
     # Generate random batch of data (batch_size, seq)
