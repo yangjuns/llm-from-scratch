@@ -385,3 +385,191 @@ token representation from `d_model = 1024` to the entire vocabulary of
 softmax tensors with shape `(4, 16, 512, 512)` and 32 MiB SwiGLU
 intermediates with shape `(4, 512, 4096)`. Their stack traces lead to
 `scaled_dot_product_attention`, the custom softmax, and `SwiGLU.forward`.
+
+## Activation checkpointing
+
+### Part (a): Memory-optimal checkpointing
+
+If the residual memory for one block dominates the checkpoint bookkeeping,
+the simplest memory-optimal strategy is to checkpoint every Transformer
+block separately:
+
+```python
+from torch.utils.checkpoint import checkpoint
+
+
+def run_checkpointed(blocks, x):
+    for block in blocks:
+        x = checkpoint(block, x, use_reentrant=False)
+    return x
+```
+
+The ordinary forward discards the interior residuals for each block and
+keeps only the checkpoint inputs. Under the stated assumption, those
+checkpoint inputs are negligible, so backward materializes the residuals
+for only one block at a time. The peak activation memory is therefore
+`O(1)` with respect to `N`, rather than `O(N)`.
+
+The original forward performs one pass and backward recomputes each block
+once, so total forward-equivalent computation is `O(N)`. Ignoring compute
+cost does not motivate a checkpoint scope smaller than one block: that is
+already the minimum residual-bearing region when a block is indivisible.
+
+### Part (b): One-recomputation checkpoint sizing
+
+For the XL configuration, each FP32 checkpoint input is 80 MiB:
+
+```text
+4 × 2048 × 2560 × 4 bytes = 83,886,080 bytes = 80 MiB
+```
+
+The handout reports approximately 3,651.31 MiB of saved residuals for one
+compiled XL block. With `N` total blocks and `k` blocks per checkpoint, the
+memory model is:
+
+```text
+peak activation memory
+≈ (N / k) × checkpoint-input size + k × one-block residual size
+```
+
+For `N = 32`, this predicts that one block per checkpoint should beat
+larger groups because an 80 MiB checkpoint saving is tiny compared with
+the additional approximately 3.6 GiB of residuals recreated for each
+extra block in a group.
+
+The focused, compiled XL experiment measured:
+
+| Blocks per checkpoint | Peak allocated memory |
+| ---: | ---: |
+| 1 | 8.481 GiB |
+| 2 | 10.796 GiB |
+| 4 | 17.300 GiB |
+
+The measured peak rises as the group size grows, validating the choice to
+checkpoint every Transformer block. Grouping two or four blocks retains
+fewer 80 MiB checkpoint inputs, but that saving is outweighed by the
+memory needed to materialize multiple blocks' residuals during backward.
+
+## PyTorch attention benchmark
+
+The benchmark used batch size 8, no head dimension, 5 warmup iterations,
+and 100 measured forward/backward iterations. Timings below are
+forward/backward means in milliseconds.
+
+Hardware: NVIDIA A100 PCIe 40 GB (driver 615.71.09), AMD Ryzen Threadripper
+3990X (128 CPU threads), and Ubuntu 24.04.5 LTS.
+
+| Dimension | 256 | 1024 | 4096 | 8192 | 16384 |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 16 | 0.397 / 0.661 | 0.694 / 1.770 | 6.700 / 17.584 | 25.083 / 65.720 | OOM |
+| 32 | 0.354 / 0.788 | 0.587 / 1.486 | 6.928 / 17.846 | 25.973 / 66.509 | OOM |
+| 64 | 0.334 / 0.793 | 0.617 / 1.517 | 7.422 / 18.398 | 27.968 / 68.759 | OOM |
+| 128 | 0.344 / 0.777 | 0.678 / 1.587 | 8.407 / 19.542 | 31.981 / 73.173 | OOM |
+
+### Eager versus compiled attention
+
+Compiled timings use `torch.compile(..., fullgraph=True)`; every entry is
+forward/backward mean time in milliseconds.
+
+| Dimension | Sequence | Eager F/B ms | Compiled F/B ms | F/B reduction | Eager/compiled memory GiB |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 16 | 256 | 0.397 / 0.661 | 0.264 / 0.469 | 33.5% / 29.0% | 0.020 / 0.020 |
+| 16 | 1024 | 0.694 / 1.770 | 0.494 / 1.231 | 28.7% / 30.5% | 0.081 / 0.081 |
+| 16 | 4096 | 6.700 / 17.584 | 3.541 / 10.456 | 47.1% / 40.5% | 1.026 / 1.026 |
+| 16 | 8192 | 25.083 / 65.720 | 12.382 / 37.082 | 50.6% / 43.6% | 4.036 / 4.036 |
+| 16 | 16384 | OOM | 52.009 / 148.970 | — | — / 16.057 |
+| 32 | 256 | 0.354 / 0.788 | 0.273 / 0.455 | 22.8% / 42.2% | 0.021 / 0.021 |
+| 32 | 1024 | 0.587 / 1.486 | 0.507 / 1.294 | 13.7% / 12.9% | 0.083 / 0.083 |
+| 32 | 4096 | 6.928 / 17.846 | 3.751 / 10.647 | 45.9% / 40.3% | 1.036 / 1.036 |
+| 32 | 8192 | 25.973 / 66.509 | 13.373 / 38.307 | 48.5% / 42.4% | 4.056 / 4.056 |
+| 32 | 16384 | OOM | 56.282 / 153.333 | — | — / 16.096 |
+| 64 | 256 | 0.334 / 0.793 | 0.355 / 0.413 | -6.0% / 48.0% | 0.022 / 0.022 |
+| 64 | 1024 | 0.617 / 1.517 | 0.422 / 1.002 | 31.6% / 33.9% | 0.088 / 0.088 |
+| 64 | 4096 | 7.422 / 18.398 | 4.269 / 11.280 | 42.5% / 38.7% | 1.055 / 1.055 |
+| 64 | 8192 | 27.968 / 68.759 | 15.519 / 40.741 | 44.5% / 40.7% | 4.095 / 4.095 |
+| 64 | 16384 | OOM | 64.357 / 164.311 | — | — / 16.174 |
+| 128 | 256 | 0.344 / 0.777 | 0.253 / 0.351 | 26.3% / 54.8% | 0.025 / 0.025 |
+| 128 | 1024 | 0.678 / 1.587 | 0.479 / 1.108 | 29.4% / 30.2% | 0.098 / 0.098 |
+| 128 | 4096 | 8.407 / 19.542 | 5.304 / 12.453 | 36.9% / 36.3% | 1.094 / 1.094 |
+| 128 | 8192 | 31.981 / 73.173 | 19.546 / 45.378 | 38.9% / 38.0% | 4.173 / 4.173 |
+| 128 | 16384 | OOM | 80.445 / 180.243 | — | — / 16.330 |
+
+For cases that both implementations completed, compilation generally
+reduced forward and backward time to approximately 49-87% and 45-87% of
+eager time, respectively. Its memory before backward was effectively
+unchanged, within 0.04%, for the shared successful configurations, but
+the 16384-sequence runs completed under compilation where eager execution
+Oomed.
+
+Memory allocated before backward at sequence length 8192 was 4.036 GiB,
+4.056 GiB, 4.095 GiB, and 4.173 GiB for dimensions 16 through 128. It
+therefore changed very little with `d_model`, while doubling sequence
+length from 4096 to 8192 increased memory by approximately 4x.
+
+For batch size `B`, sequence length `S`, model/head dimension `D`, and
+`b` bytes per element:
+
+```text
+one Q, K, V, output, or Q/K/V gradient tensor = B × S × D × b bytes
+one attention score/probability tensor         = B × S × S × b bytes
+naive attention memory                         = O(BSD) + O(BS²)
+```
+
+The `D`-dependent terms store token representations, so increasing `D`
+has only a modest effect at these sizes. The `S²` terms materialize one
+value for every query-key pair and dominate long-sequence memory; several
+such score/softmax/intermediate matrices may coexist during forward and
+backward.
+
+The smallest OOM configuration was batch 8, dimension 16, and sequence
+length 16384. A single FP32 attention score or probability matrix for this
+case consumes:
+
+```text
+8 × 16384 × 16384 × 4 bytes = 8 GiB
+```
+
+At least the score and probability matrices coexist or must be retained
+for backward, accounting for roughly 16 GiB before Q/K/V inputs, output,
+other saved softmax intermediates, and CUDA workspace. This explains why
+all four dimensions OOM at sequence length 16384. Attention time grows
+approximately with the matrix-multiplication work `O(S²D)`, while the
+dominant saved memory is quadratic in sequence length, `O(S²)`, motivating
+a tiled implementation that does not materialize the complete
+score/probability matrices.
+
+Autograd saves the tensors required by backward while each operation runs
+during the forward pass; it does not wait for `backward()` to start. At the
+benchmark's memory-measurement point, forward is complete, so short-lived
+fusion temporaries may already have been freed and the remaining memory is
+dominated by tensors intentionally retained for backward.
+
+Consequently, fusion can reduce the *transient peak during forward* without
+changing the measured pre-backward memory substantially. Measuring that
+temporary benefit would require resetting peak-memory statistics before
+each forward and reading `torch.cuda.max_memory_allocated()` immediately
+after it completes. The compiled run's ability to finish sequence length
+16384, where eager execution OOMed, is evidence that its transient
+allocation peak was lower even though retained memory for backward remained
+approximately quadratic.
+
+### Whole-model compile benchmark
+
+The XL FP32 run exceeded the A100 40 GB capacity, so the controlled whole-
+model comparison used the largest FP32 configuration that completed:
+large (`d_model=1280`, `d_ff=5120`, 36 layers, 20 heads), context length
+512, batch size 4, five warmup steps, and ten measured steps. Both eager
+and compiled runs used FP32 with `torch.set_float32_matmul_precision`
+left at the PyTorch default.
+
+| Stage | Vanilla | Compiled | Runtime reduction | Speedup |
+| --- | ---: | ---: | ---: | ---: |
+| Forward | 0.298271 s/step | 0.263850 s/step | 11.54% | 1.130x |
+| Forward + backward + AdamW | 1.045095 s/step | 0.928128 s/step | 11.19% | 1.126x |
+
+Full-graph compilation reduced both workloads by approximately 11%.
+The reduction remains visible in the complete training step, although the
+optimizer and backward work limit the total gain relative to forward-only
+profiling. XL was recorded as unavailable under this FP32 memory budget
+rather than changing precision or model shape between the eager and
+compiled runs.
