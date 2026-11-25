@@ -12,6 +12,12 @@ export MAX_TOKENS="${MAX_TOKENS:-256}"
 export TEMPERATURE="${TEMPERATURE:-0.8}"
 export TOP_P="${TOP_P:-0.9}"
 export SEED="${SEED:-0}"
+export NOPE="${NOPE:-0}"
+
+case "$NOPE" in
+    0|1) ;;
+    *) echo "NOPE must be 0 or 1" >&2; exit 1 ;;
+esac
 
 uv run python - <<'EOF'
 import os
@@ -38,6 +44,7 @@ model = TransformerLM(
     d_ff=1344,
     rope_theta=10_000.0,
     device=torch.device(device),
+    enable_rope=os.environ["NOPE"] != "1",
 )
 ckpt = torch.load(os.environ["CHECKPOINT"], map_location=device)
 model.load_state_dict(ckpt["model"])

@@ -5,6 +5,7 @@ import logging
 import math
 import os
 import warnings
+from contextlib import nullcontext
 
 import einx
 import torch
@@ -16,6 +17,12 @@ from torch import Tensor
 from cs336_basics.nn_utils import softmax
 
 logger = logging.getLogger(__name__)
+
+
+def nvtx_range(name: str):
+    if torch.compiler.is_compiling():
+        return nullcontext()
+    return torch.cuda.nvtx.range(name)
 
 
 class Linear(nn.Module):
@@ -378,14 +385,22 @@ class TransformerBlock(nn.Module):
         """
         # NOTE: this is a pre-norm Transformer, and differs from the original
         # description in the paper.
-        # Apply the multi-head self-attention sublayer
-        x_attn = self.attn(self.ln1(x))
-        attn_sublayer_output = x + x_attn
+        with nvtx_range("transformer_block"):
+            # Apply the multi-head self-attention sublayer
+            with nvtx_range("attention_rmsnorm"):
+                normalized_x = self.ln1(x)
+            with nvtx_range("self_attention"):
+                x_attn = self.attn(normalized_x)
+            with nvtx_range("attention_residual"):
+                attn_sublayer_output = x + x_attn
 
-        # Apply the feed-forward sublayer
-        x_ffn = self.ffn(self.ln2(attn_sublayer_output))
-        ffn_sublayer_output = attn_sublayer_output + x_ffn
-        return ffn_sublayer_output
+            # Apply the feed-forward sublayer
+            with nvtx_range("ffn_rmsnorm"):
+                normalized_attn = self.ln2(attn_sublayer_output)
+            with nvtx_range("swiglu"):
+                x_ffn = self.ffn(normalized_attn)
+            with nvtx_range("ffn_residual"):
+                return attn_sublayer_output + x_ffn
 
 
 class SwiGLU(nn.Module):
@@ -396,7 +411,16 @@ class SwiGLU(nn.Module):
         self.w3 = Linear(d_model, d_ff)
 
     def forward(self, x):
-        return self.w2(silu(self.w1(x)) * self.w3(x))
+        with nvtx_range("swiglu_w1"):
+            w1_output = self.w1(x)
+        with nvtx_range("swiglu_w3"):
+            w3_output = self.w3(x)
+        with nvtx_range("swiglu_silu"):
+            activated_w1 = silu(w1_output)
+        with nvtx_range("swiglu_elementwise_mul"):
+            hidden = activated_w1 * w3_output
+        with nvtx_range("swiglu_w2"):
+            return self.w2(hidden)
 
 
 def scaled_dot_product_attention(
@@ -424,14 +448,18 @@ def scaled_dot_product_attention(
     """
 
     d_k = K.shape[-1]
-    attention_scores = einsum(Q, K, "... query d_k, ... key d_k -> ... query key") / math.sqrt(d_k)
+    with nvtx_range("attention_qk_matmul"):
+        attention_scores = einsum(Q, K, "... query d_k, ... key d_k -> ... query key")
+    attention_scores = attention_scores / math.sqrt(d_k)
 
     if mask is not None:
         attention_scores = torch.where(mask, attention_scores, float("-inf"))
 
-    attention_weights = softmax(attention_scores, dim=-1)  # Softmax over the key dimension
+    with nvtx_range("attention_softmax"):
+        attention_weights = softmax(attention_scores, dim=-1)
 
-    return einsum(attention_weights, V, "... query key, ... key d_v ->  ... query d_v")
+    with nvtx_range("attention_av_matmul"):
+        return einsum(attention_weights, V, "... query key, ... key d_v ->  ... query d_v")
 
 
 class CausalMultiHeadSelfAttention(nn.Module):

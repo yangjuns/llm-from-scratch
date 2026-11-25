@@ -333,6 +333,8 @@ class TransformerBlock(torch.nn.Module):
         theta: float,
         device: torch.device | None = None,
         dtype: torch.dtype | None = None,
+        use_rmsnorm: bool = True,
+        enable_rope: bool = True,
     ):
         super().__init__()
         self.d_model = d_model
@@ -341,28 +343,36 @@ class TransformerBlock(torch.nn.Module):
         self.max_seq_len = max_seq_len
         self.theta = theta
         # Block components
-        self.norm1 = RMSNorm(d_model, device=device, dtype=dtype)
+        self.norm1 = (
+            RMSNorm(d_model, device=device, dtype=dtype)
+            if use_rmsnorm
+            else torch.nn.Identity()
+        )
         self.attention = MultiHeadSelfAttention(
             d_model,
             num_heads,
-            True,
+            enable_rope,
             theta,
             max_seq_len,
             device,
             dtype,
         )
-        self.norm2 = RMSNorm(d_model, device=device, dtype=dtype)
+        self.norm2 = (
+            RMSNorm(d_model, device=device, dtype=dtype)
+            if use_rmsnorm
+            else torch.nn.Identity()
+        )
         self.feed_forward = SwiGLUFF(d_model, d_ff, device, dtype)
 
     def forward(
-        self, x: torch.Tensor, token_positions: torch.Tensor
+        self, x: torch.Tensor, token_positions: torch.Tensor | None
     ) -> torch.Tensor:
         """
         Forward pass of the Transformer block.
 
         Args:
             x (torch.Tensor): Input tensor of shape (batch, seq, d_model).
-            token_positions (torch.Tensor): Tensor containing the positions of tokens in the sequence.
+            token_positions (torch.Tensor | None): Positions for RoPE, if enabled.
 
         Returns:
             torch.Tensor: Output tensor of shape (batch, seq, d_model).
@@ -383,6 +393,8 @@ class TransformerLM(torch.nn.Module):
         rope_theta: float,
         device: torch.device | None = None,
         dtype: torch.dtype | None = None,
+        use_rmsnorm: bool = True,
+        enable_rope: bool = True,
     ):
         super().__init__()
         self.vocab_size = vocab_size
@@ -392,6 +404,7 @@ class TransformerLM(torch.nn.Module):
         self.num_heads = num_heads
         self.d_ff = d_ff
         self.rope_theta = rope_theta
+        self.enable_rope = enable_rope
         self.device = device
         self.dtype = dtype
 
@@ -405,6 +418,8 @@ class TransformerLM(torch.nn.Module):
                     rope_theta,
                     device=device,
                     dtype=dtype,
+                    use_rmsnorm=use_rmsnorm,
+                    enable_rope=enable_rope,
                 )
                 for _ in range(num_layers)
             ]
@@ -412,7 +427,11 @@ class TransformerLM(torch.nn.Module):
         self.token_embeddings = torch.nn.Embedding(
             vocab_size, d_model, device=device, dtype=dtype
         )
-        self.ln_final = RMSNorm(d_model, device=device, dtype=dtype)
+        self.ln_final = (
+            RMSNorm(d_model, device=device, dtype=dtype)
+            if use_rmsnorm
+            else torch.nn.Identity()
+        )
         self.lm_head = Linear(d_model, vocab_size, device=device, dtype=dtype)
 
     def forward(
@@ -420,11 +439,11 @@ class TransformerLM(torch.nn.Module):
     ) -> torch.Tensor:
         """
         x: (batch, seq) token ids.
-        token_positions: optional (batch, seq) integer positions. Defaults to
-        0..seq-1 for every sequence.
+        token_positions: optional (batch, seq) integer positions for RoPE.
+        Defaults to 0..seq-1 for every sequence; ignored when RoPE is disabled.
         Returns unnormalized logits of shape (batch, seq, vocab_size).
         """
-        if token_positions is None:
+        if self.enable_rope and token_positions is None:
             batch, seq = x.shape
             positions = torch.arange(seq, device=x.device)
             token_positions = positions.unsqueeze(0).expand(batch, seq)

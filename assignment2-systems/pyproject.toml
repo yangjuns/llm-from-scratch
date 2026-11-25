@@ -47,7 +47,7 @@ filterwarnings = [
 ]
 
 [tool.ruff]
-line-length = 180
+line-length = 80
 
 [tool.ruff.lint.extend-per-file-ignores]
 # Also ignore `E402` in all `__init__.py` files.

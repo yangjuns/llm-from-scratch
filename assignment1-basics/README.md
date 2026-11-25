@@ -61,3 +61,58 @@ The arrays are saved under `data/tokenized/` as `tinystories_train.npy`,
 `tinystories_valid.npy`, `owt_train.npy`, and `owt_valid.npy`. They can be
 loaded without reading the full arrays into memory using
 `np.load(path, mmap_mode="r")`.
+
+### Training precision
+
+Training and evaluation default to FP32. Pass `--dtype bfloat16` to use
+BF16 autocast for eligible forward operations on CPU or a CUDA device with
+native BF16 support, such as an RTX 4090. Parameters, gradients, AdamW state,
+and the cross-entropy calculation remain FP32. BF16 does not halve total
+training memory, and the feasible batch size must be measured.
+
+For example, add `--dtype bfloat16` to a training command. Use the same option
+when resuming a BF16 run: checkpoints store the model and optimizer, but not
+the requested training precision.
+
+### Gradient accumulation
+
+`--batch-size` sets the number of sequences in each physical micro-batch.
+Use `--gradient-accumulation-steps` to average gradients over multiple
+micro-batches before clipping and updating the model. The default is 1,
+which preserves the original one-batch-per-update behavior. For example,
+`--batch-size 4 --gradient-accumulation-steps 16` gives an effective batch of
+64 sequences; with `--context-length 1024`, that is 65,536 tokens per update.
+
+Training loss is the mean across the micro-batches. Learning-rate scheduling,
+logging, evaluation, and checkpoint intervals count optimizer updates, not
+micro-batches. Evaluation still uses `--batch-size` sequences per evaluation
+batch. Checkpoints do not store the accumulation setting; pass the intended
+settings explicitly when resuming.
+
+For memory or throughput pilots, pass `--no-checkpoint` to disable both
+periodic and final checkpoint writes. No training progress from such a run
+can be resumed unless it was saved separately.
+
+### No positional encoding experiment
+
+Pass `--nope` to training to disable RoPE in every transformer layer. The
+causal attention mask remains enabled. RMSNorm remains enabled unless
+`--no-rmsnorm` is also specified. For example:
+
+```sh
+uv run python -m cs336_basics.train \
+  --train-data data/tokenized/tinystories_train.npy \
+  --valid-data data/tokenized/tinystories_valid.npy \
+  --batch-size 64 --max-lr 1e-3 --min-lr 1e-4 \
+  --nope --checkpoint-dir checkpoints/nope-lr-1e-3
+```
+
+RoPE is enabled by default, and `--rope-theta` has no effect with `--nope`.
+RoPE and NoPE checkpoints have the same weight keys, so loading a checkpoint
+does not identify which mode was used. Always pass `--nope` when resuming a
+NoPE training run and set `NOPE=1` when generating from a NoPE checkpoint:
+
+```sh
+NOPE=1 CHECKPOINT=checkpoints/nope-lr-1e-3/latest.pt \
+  bash scripts/generate_sample.sh
+```
