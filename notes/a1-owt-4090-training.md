@@ -192,6 +192,82 @@ keep the same model, optimizer and schedule arguments, add `--resume` with
 the checkpoint path, and use the W&B run ID with `--wandb-run-id` if resuming
 the same run. Checkpoint resume does not restore random generator states.
 
+## OpenWebText model sample
+
+The downloaded `assignment1-basics/checkpoints/owt-228m-bf16/latest.pt`
+checkpoint reports **55,000 steps**. The sample below was generated on CPU
+with the OpenWebText training tokenizer, using FP32, prompt
+`The future of artificial intelligence`, temperature 0.8, top-p 0.9, seed 0,
+and a limit of 1,024 new tokens. It reached that limit without emitting
+`<|endoftext|>`, so its final sentence is incomplete. Decoding recomputes the
+full context at each step.
+
+| Model / checkpoint setting | Value |
+|---|---|
+| Parameters | 228,189,984 |
+| Architecture | Vocabulary 32,000; context 1,024; width 1,056; 12 layers; 12 heads; feed-forward width 2,816; RoPE theta 10,000 |
+| Checkpoint optimizer | AdamW; betas `(0.9, 0.95)`; epsilon `1e-8`; weight decay `0.1`; saved learning rate `0.00019873034818808605` |
+
+The full-run plan above specifies OpenWebText, BF16 mixed precision on an RTX
+4090, micro-batch 8, gradient accumulation 8 (effective batch 64),
+peak/minimum learning rates `1e-3`/`1e-4`, 200 warmup steps, 70,000
+scheduled steps, gradient clipping at 1.0, and checkpoints every 5,000 steps.
+These settings are documented as the plan; the checkpoint does not
+independently confirm the full training configuration. In particular, the
+downloaded checkpoint is at step 55,000, not 70,000.
+
+```text
+The future of artificial intelligence is going to be different than the present, but we are going to have to wait and see.
+
+I don’t know if this is the best thing for the world. What is the possibility for it to come out of the dark, or the technological revolution to change it? If I can build a machine that can do that, and will do it, then that means it will be able to do that. But we have to look at the present in terms of the past and think about how that future is going to unfold, and what the future of this technology is going to be.
+
+I think that the most important thing for the future of this technology is what we have got to do. What we have got to do is to put in place an AI machine that will be able to do that. That is what the researchers have been talking about. They have been talking about what is the best AI machine that can do that.
+
+I think that AI, as we have seen in the past, is going to have a huge impact on the way that we live, and the way that we live in the future, and we have to take it all on the way.
+
+You know what? The challenge is to understand how AI will work in the future. And it will work in the way that it has been used for the past, and I think that’s a challenge.
+
+One of the problems I had with the past is that we’ve had a big shift from a “big” in the sense that we had no experience, to a “big” and “big” in a way that we now have a lot of experience. That’s not the same kind of experience that we had in the past, but I think that’s also a good thing, because if we don’t have a lot of experience in the future, that’s going to be difficult to sort of understand.
+
+I think that’s a good thing for the future, because I think we are going to have to start going back to that kind of point where we had no experience, and we have to start looking at what we can do with what we have now in order to better understand what the future holds.
+
+We have to do better than we have been doing in the past. So I think that the challenge is to make sure that the ability to do that is a new world. It’s about a new human understanding of what it means to be human, and the future is going to be different than what we have had before.
+
+I think that this will be the most important thing for the future of the future.
+
+I am very optimistic about what the future holds for us. That is a very promising thing for us.
+
+And I think we have to make sure that we are living in a world in which we have no experience, and we have no experience. That is a very exciting thing, and I think that it will be very exciting for us to have a lot of experience, but also a lot of experience in terms of how that future will unfold.
+
+It is possible to make the future happen on a bigger scale, and we have to work with that. I think that we have to make sure that we can do that.
+
+But if you are going to do that, you have to do it on a large scale, and I think that’s what we are going to have to do.
+
+It is going to be a huge challenge.
+
+It will be a challenge to make the future happen, and I think that’s going to be the most important thing for the future.
+
+I think that we have to look at how we can do that.
+
+We have to look at what is the best future for this technology, and I think that’s a challenge for us.
+
+I think that the first step is to make sure that we are living in a world in which we have no experience, and we have no experience.
+
+And I think that is a very exciting thing, and I think that it is going to be very exciting for us.
+
+We are going to have to work with that.
+
+We are going to have to make that much more exciting, and I think that’s really the most exciting thing for the future of this technology, and the future will be different.
+
+So we are going to have to work very, very hard on the ability to do that, and we have to make that much more exciting.
+
+We have to do it on a large scale, and we have to make it as big as it can be, and I think that’s the most exciting thing for us.
+
+And I think that we have to make sure that we are living in a world in which we have no experience, and we have no experience.
+
+So I think that we have to look at that, and I think that is a very
+```
+
 ## Initial 134M candidate and memory estimates
 
 The initial candidate was 12 layers, width 768, 12 heads,
