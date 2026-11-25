@@ -22,15 +22,26 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--iterations", type=int, default=100)
     parser.add_argument("--warmup", type=int, default=5)
     parser.add_argument(
+        "--compile",
+        action="store_true",
+        help="compile the attention function with torch.compile",
+    )
+    parser.add_argument(
         "--output",
         type=Path,
-        default=Path("results/benchmark_attention.csv"),
+        help=(
+            "CSV output path; defaults to results/benchmark_attention.csv "
+            "or results/benchmark_attention_compiled.csv"
+        ),
     )
     args = parser.parse_args()
     if args.iterations <= 0:
         parser.error("--iterations must be positive")
     if args.warmup < 0:
         parser.error("--warmup must be nonnegative")
+    if args.output is None:
+        suffix = "_compiled" if args.compile else ""
+        args.output = Path(f"results/benchmark_attention{suffix}.csv")
     return args
 
 
@@ -55,15 +66,21 @@ def run_case(
     sequence_length: int,
     iterations: int,
     warmup: int,
+    compile_attention: bool,
 ) -> dict[str, Any]:
     shape = (BATCH_SIZE, sequence_length, dimension)
     q = torch.randn(shape, device="cuda", requires_grad=True)
     k = torch.randn(shape, device="cuda", requires_grad=True)
     v = torch.randn(shape, device="cuda", requires_grad=True)
     upstream = torch.randn(shape, device="cuda")
+    attention_impl = (
+        torch.compile(attention, fullgraph=True)
+        if compile_attention
+        else attention
+    )
 
     for _ in range(warmup):
-        output = attention(q, k, v)
+        output = attention_impl(q, k, v)
         output.backward(upstream)
         q.grad = k.grad = v.grad = None
     torch.cuda.synchronize()
@@ -73,7 +90,7 @@ def run_case(
     memory_before_backward = 0
 
     for _ in range(iterations):
-        forward_ms, output = elapsed_ms(lambda: attention(q, k, v))
+        forward_ms, output = elapsed_ms(lambda: attention_impl(q, k, v))
         forward_times.append(forward_ms)
         memory_before_backward = max(
             memory_before_backward,
@@ -111,6 +128,7 @@ def main() -> None:
                     sequence_length,
                     args.iterations,
                     args.warmup,
+                    args.compile,
                 )
                 print(
                     f"  forward={result['forward_ms']:.3f} ms, "
@@ -134,6 +152,9 @@ def main() -> None:
                 torch.cuda.empty_cache()
 
             results.append(result)
+
+            if result["status"] == "ok":
+                torch._dynamo.reset()
 
     fieldnames = (
         "dimension",
